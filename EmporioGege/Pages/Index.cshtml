@@ -1,0 +1,41 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Início";
+}
+
+<div class="container text-center mt-5">
+    <h1 class="display-4 fw-bold">Gestão Inteligente para sua Adega</h1>
+    <p class="lead mt-3 text-muted">
+        O sistema definitivo para controlar seu estoque, caixa e fiado sem dor de cabeça.
+        Feito para o giro rápido do balcão e a organização que o dono precisa.
+    </p>
+
+    <div class="d-flex justify-content-center flex-wrap gap-3 mt-5">
+        <!-- Botão de Login (Cliente) -->
+        <a href="/Auth/Login" class="btn btn-primary btn-lg px-4">Acessar Sistema</a>
+
+        <!-- Botão de Cadastro/Assinatura -->
+        <a href="/Auth/Planos" class="btn btn-success btn-lg px-4">Assinar / Teste Grátis</a>
+
+        <!-- Botão de Contato com sua empresa -->
+        <a href="https://wa.me/5515999999999" target="_blank" class="btn btn-outline-secondary btn-lg px-4">Fale com a Nossa Equipe</a>
+    </div>
+
+    <hr class="my-5" />
+
+    <div class="row text-start mt-4">
+        <div class="col-md-4 mb-4">
+            <h3>📦 Estoque Real</h3>
+            <p class="text-muted">Controle inteligente com fator de conversão. Vendeu a caixa? O sistema baixa as latas automaticamente.</p>
+        </div>
+        <div class="col-md-4 mb-4">
+            <h3>💰 Caixa Cego</h3>
+            <p class="text-muted">Segurança total no fechamento do turno. O operador conta o dinheiro sem ver o saldo esperado pelo sistema.</p>
+        </div>
+        <div class="col-md-4 mb-4">
+            <h3>🤝 Gestão de Fiado</h3>
+            <p class="text-muted">Controle o limite de crédito por cliente, histórico de compras e baixa de pagamentos de forma fácil.</p>
+        </div>
+    </div>
+</div>

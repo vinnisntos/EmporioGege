@@ -1,0 +1,33 @@
+﻿@page
+@model EmporioGege.Pages.Auth.LoginModel
+@{
+    ViewData["Title"] = "Login";
+}
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-5 col-lg-4">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                <h3 class="text-center mb-4 fw-bold">Acesso ao Sistema</h3>
+
+                <form method="post">
+                    <div class="mb-3">
+                        <label for="Email" class="form-label">E-mail</label>
+                        <input type="email" class="form-control form-control-lg" id="Email" asp-for="Email" required placeholder="seu@email.com">
+                    </div>
+                    <div class="mb-4">
+                        <label for="Senha" class="form-label">Senha</label>
+                        <input type="password" class="form-control form-control-lg" id="Senha" asp-for="Senha" required placeholder="••••••••">
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">Entrar</button>
+                    </div>
+                </form>
+
+                <div class="text-center mt-4">
+                    <a href="/" class="text-decoration-none text-muted">← Voltar para o site</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
