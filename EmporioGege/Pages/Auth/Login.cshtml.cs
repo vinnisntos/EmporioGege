@@ -29,13 +29,16 @@ namespace EmporioGege.Pages.Auth
 
         public string? MensagemErro { get; set; }
 
-        public void OnGet()
+        // CORREÇÃO DE UX/ENGENHARIA: Mudado de 'void' para 'IActionResult'
+        public IActionResult OnGet()
         {
-            // Se o cara já estiver logado e tentar entrar no login, joga ele para fora
+            // Se o cara já estiver logado e tentar entrar no login, agora ele é ejetado de verdade
             if (User.Identity?.IsAuthenticated == true)
             {
-                RedirecionarPorRole(User.FindFirst(ClaimTypes.Role)?.Value);
+                return RedirecionarPorRole(User.FindFirst(ClaimTypes.Role)?.Value);
             }
+
+            return Page();
         }
 
         public async Task<IActionResult> OnPostAsync()
@@ -72,17 +75,17 @@ namespace EmporioGege.Pages.Auth
                     new Claim(ClaimTypes.NameIdentifier, resultadoPerfil.Id),
                     new Claim(ClaimTypes.Name, resultadoPerfil.Nome),
                     new Claim(ClaimTypes.Role, resultadoPerfil.Role),
-                    new Claim("TenantId", resultadoPerfil.TenantId ?? "") // Se for null (SuperAdmin), fica vazio
+                    new Claim("TenantId", resultadoPerfil.TenantId ?? "")
                 };
 
                 var identidade = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
                 var principal = new ClaimsPrincipal(identidade);
 
-                // 4. Salva o cookie HttpOnly trancado no navegador do usuário
+                // 4. Salva o cookie HttpOnly trancado no navegador do usuário (Blindagem contra XSS)
                 await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties
                 {
-                    IsPersistent = true, // Mantém logado mesmo se fechar o navegador (lembrar-me)
-                    ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8) // Expira em 8 horas (um turno de trabalho)
+                    IsPersistent = true,
+                    ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8)
                 });
 
                 // 5. Redireciona o cara para o painel correto dele
@@ -90,6 +93,7 @@ namespace EmporioGege.Pages.Auth
             }
             catch (Exception)
             {
+                // Cybersecurity: Mensagem genérica para não vazar detalhes do banco em caso de pane
                 MensagemErro = "Erro ao tentar realizar o login. Verifique os dados ou a conexão.";
                 return Page();
             }
@@ -97,11 +101,12 @@ namespace EmporioGege.Pages.Auth
 
         private IActionResult RedirecionarPorRole(string? role)
         {
+            // O .NET vai ignorar se a pasta é maiúscula ou minúscula na rota, vai achar o "/SuperAdmin/Index" de boa!
             return role switch
             {
                 "superadmin" => RedirectToPage("/SuperAdmin/Index"),
                 "administrador" => RedirectToPage("/Admin/Index"),
-                _ => RedirectToPage("/Caixa/Index") // Vendedor / Caixa cai aqui
+                _ => RedirectToPage("/Caixa/Index")
             };
         }
     }

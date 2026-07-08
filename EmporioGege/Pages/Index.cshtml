@@ -3,12 +3,12 @@
 @{
     Layout = null;
 }
-
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Sistema de gestão inteligente para adegas e comércio de bebidas." />
     <title>Empório Gege - Gestão Inteligente</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,127 +16,127 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
-            body {
-                font-family: 'Poppins', sans-serif;
-                background: radial-gradient(circle at top left, #2c1a04 0%, #0c0c0e 100%);
-                min-height: 100vh;
-                color: #f8f9fa;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-            }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: radial-gradient(circle at top left, #2c1a04 0%, #0c0c0e 100%);
+            min-height: 100vh;
+            color: #f8f9fa;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
 
-            .hero-section {
-                padding: 4rem 1rem 2rem 1rem;
-            }
+        .hero-section {
+            padding: 4rem 1rem 2rem 1rem;
+        }
 
-            .brand-title {
-                font-weight: 800;
-                font-size: 3.5rem;
-                letter-spacing: 1px;
-                background: linear-gradient(45deg, #ffffff, #ffc107);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-            }
+        .brand-title {
+            font-weight: 800;
+            font-size: 3.5rem;
+            letter-spacing: 1px;
+            background: linear-gradient(45deg, #ffffff, #ffc107);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
 
-            .text-muted-custom {
-                color: #a0a0aa;
-                max-width: 700px;
-                margin: 0 auto;
-            }
+        .text-muted-custom {
+            color: #a0a0aa;
+            max-width: 700px;
+            margin: 0 auto;
+        }
 
-            /* Botões Estilizados */
-            .btn-access {
-                background: linear-gradient(45deg, #ff9800, #e65100);
-                border: none;
-                color: #fff;
-                padding: 0.8rem 2rem;
-                font-weight: 600;
-                border-radius: 8px;
-                transition: transform 0.2s, opacity 0.2s, box-shadow 0.2s;
-                box-shadow: 0 4px 15px rgba(230, 81, 0, 0.3);
-            }
+        /* Botões Estilizados */
+        .btn-access {
+            background: linear-gradient(45deg, #ff9800, #e65100);
+            border: none;
+            color: #fff;
+            padding: 0.8rem 2rem;
+            font-weight: 600;
+            border-radius: 8px;
+            transition: transform 0.2s, opacity 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(230, 81, 0, 0.3);
+        }
 
-                .btn-access:hover {
-                    opacity: 0.95;
-                    color: #fff;
-                    box-shadow: 0 6px 20px rgba(230, 81, 0, 0.5);
-                    transform: translateY(-2px);
-                }
+        .btn-access:hover {
+            opacity: 0.95;
+            color: #fff;
+            box-shadow: 0 6px 20px rgba(230, 81, 0, 0.5);
+            transform: translateY(-2px);
+        }
 
-            .btn-planos {
-                background: rgba(40, 167, 69, 0.15);
-                border: 1px solid rgba(40, 167, 69, 0.4);
-                color: #28a745;
-                padding: 0.8rem 2rem;
-                font-weight: 600;
-                border-radius: 8px;
-                transition: all 0.3s ease;
-            }
+        .btn-planos {
+            background: rgba(40, 167, 69, 0.15);
+            border: 1px solid rgba(40, 167, 69, 0.4);
+            color: #28a745;
+            padding: 0.8rem 2rem;
+            font-weight: 600;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
 
-                .btn-planos:hover {
-                    background: #28a745;
-                    color: #fff;
-                    transform: translateY(-2px);
-                }
+        .btn-planos:hover {
+            background: #28a745;
+            color: #fff;
+            transform: translateY(-2px);
+        }
 
-            .btn-contact {
-                background: rgba(255, 255, 255, 0.05);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                color: #f8f9fa;
-                padding: 0.8rem 2rem;
-                font-weight: 500;
-                border-radius: 8px;
-                transition: all 0.3s ease;
-            }
+        .btn-contact {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #f8f9fa;
+            padding: 0.8rem 2rem;
+            font-weight: 500;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
 
-                .btn-contact:hover {
-                    background: rgba(255, 255, 255, 0.1);
-                    color: #fff;
-                    transform: translateY(-2px);
-                }
+        .btn-contact:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            transform: translateY(-2px);
+        }
 
-            /* Cards de Funcionalidades */
-            .feature-card {
-                background: rgba(20, 20, 25, 0.6);
-                backdrop-filter: blur(10px);
-                border: 1px solid rgba(255, 255, 255, 0.05);
-                border-radius: 16px;
-                padding: 2rem;
-                height: 100%;
-                transition: transform 0.3s ease, border-color 0.3s ease;
-            }
+        /* Cards de Funcionalidades */
+        .feature-card {
+            background: rgba(20, 20, 25, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 2rem;
+            height: 100%;
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
 
-                .feature-card:hover {
-                    transform: translateY(-5px);
-                    border-color: rgba(255, 193, 7, 0.3);
-                }
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255, 193, 7, 0.3);
+        }
 
-            .feature-icon {
-                font-size: 2rem;
-                margin-bottom: 1rem;
-                display: inline-block;
-            }
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            display: inline-block;
+        }
 
-            .feature-card h3 {
-                font-size: 1.25rem;
-                font-weight: 600;
-                color: #ffc107;
-                margin-bottom: 0.75rem;
-            }
+        .feature-card h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #ffc107;
+            margin-bottom: 0.75rem;
+        }
 
-            .feature-card p {
-                font-size: 0.925rem;
-                color: #a0a0aa;
-                margin-bottom: 0;
-                line-height: 1.6;
-            }
+        .feature-card p {
+            font-size: 0.925rem;
+            color: #a0a0aa;
+            margin-bottom: 0;
+            line-height: 1.6;
+        }
 
-            hr.custom-hr {
-                border-top: 1px solid rgba(255, 255, 255, 0.08);
-                max-width: 900px;
-                margin: 4rem auto;
-            }
+        hr.custom-hr {
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            max-width: 900px;
+            margin: 4rem auto;
+        }
     </style>
 </head>
 <body>
@@ -149,13 +149,17 @@
         </p>
 
         <div class="d-flex justify-content-center flex-wrap gap-3 mt-5">
-            <a href="/Auth/Login" class="btn btn-access btn-lg d-flex align-items-center">
+            <!-- Arquitetura .NET: Motores de rotas nativos aplicados -->
+            <a asp-page="/Auth/Login" class="btn btn-access btn-lg d-flex align-items-center">
                 Acessar Sistema
             </a>
 
-            <a href="/Auth/Planos" class="btn btn-planos btn-lg">Assinar / Teste Grátis</a>
+            <a asp-page="/Auth/Planos" class="btn btn-planos btn-lg">Assinar / Teste Grátis</a>
 
-            <a href="https://wa.me/5515999999999" target="_blank" class="btn btn-contact btn-lg">Fale com a Equipe</a>
+            <!-- Segurança Cibernética: rel="noopener noreferrer" inserido para mitigar Reverse Tabnabbing -->
+            <a href="https://wa.me/5515981636193" target="_blank" rel="noopener noreferrer" class="btn btn-contact btn-lg">
+                Fale com a Equipe
+            </a>
         </div>
 
         <hr class="custom-hr" />
@@ -163,7 +167,7 @@
         <div class="row text-start justify-content-center px-3">
             <div class="col-lg-4 col-md-6 mb-4">
                 <div class="feature-card">
-                    <span class="feature-icon">📦</span>
+                    <span class="feature-icon" aria-hidden="true">📦</span>
                     <h3>Estoque Real</h3>
                     <p>Controle inteligente com fator de conversão. Vendeu a caixa? O sistema faz a quebra e baixa as latas automaticamente no banco.</p>
                 </div>
@@ -171,7 +175,7 @@
 
             <div class="col-lg-4 col-md-6 mb-4">
                 <div class="feature-card">
-                    <span class="feature-icon">💰</span>
+                    <span class="feature-icon" aria-hidden="true">💰</span>
                     <h3>Caixa Cego</h3>
                     <p>Segurança total no fechamento do turno. O operador conta o dinheiro da gaveta sem ver o saldo esperado pelo sistema, evitando fraudes.</p>
                 </div>
@@ -179,7 +183,7 @@
 
             <div class="col-lg-4 col-md-6 mb-4">
                 <div class="feature-card">
-                    <span class="feature-icon">🤝</span>
+                    <span class="feature-icon" aria-hidden="true">🤝</span>
                     <h3>Gestão de Fiado</h3>
                     <p>Controle o limite de crédito por cliente, histórico detalhado de compras pendentes e faça a baixa parcial ou total de pagamentos de forma fácil.</p>
                 </div>

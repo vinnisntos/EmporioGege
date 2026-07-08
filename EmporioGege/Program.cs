@@ -3,9 +3,10 @@ using Supabase;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Configuração do Supabase
-var url = builder.Configuration["Supabase:Url"];
-var key = builder.Configuration["Supabase:Key"];
+// 1. Configuração do Supabase (Ajustado com '!' para sumir o Warning CS8604)
+var url = builder.Configuration["Supabase:Url"]!;
+var key = builder.Configuration["Supabase:Key"]!;
+
 builder.Services.AddScoped<Client>(_ => new Client(url, key, new SupabaseOptions { AutoConnectRealtime = true }));
 
 // 2. Ativa a Autenticação por Cookies no navegador
@@ -31,9 +32,6 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizeFolder("/SuperAdmin", "SuperAdminOnly");
     options.Conventions.AuthorizeFolder("/Admin", "AdminOnly");
     options.Conventions.AuthorizeFolder("/Caixa", "CaixaOnly");
-
-    // Nota: Assim que você mover as páginas de Estoque e Clientes para dentro de /Admin,
-    // elas herdarão a proteção automaticamente!
 });
 
 var app = builder.Build();
@@ -49,12 +47,10 @@ app.UseHttpsRedirection();
 app.UseRouting();
 
 // 5. ATENÇÃO: A ordem aqui importa muito!
-// Primeiro o sistema descobre QUEM é o usuário (Authentication), depois decide o que ele PODE fazer (Authorization).
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();
-app.MapRazorPages()
-   .WithStaticAssets();
+app.MapRazorPages().WithStaticAssets();
 
 app.Run();

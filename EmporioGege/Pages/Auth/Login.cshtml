@@ -1,102 +1,89 @@
 ﻿@page
 @model EmporioGege.Pages.Auth.LoginModel
 @{
-    Layout = null;
+    ViewData["Title"] = "Login - PendurAi";
+    Layout = "_Layout"; // Aciona a casca global do sistema
 }
 
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Login - Empório Gege</title>
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+    /* Mantemos apenas as classes exclusivas da tela de login para não quebrar o design */
+    .auth-wrapper {
+        min-height: 75vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
 
-    <style>
-            body {
-                font-family: 'Poppins', sans-serif;
-                background: radial-gradient(circle at top right, #2c1a04 0%, #0c0c0e 100%);
-                min-height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: #f8f9fa;
-            }
+    .login-card {
+        background: rgba(20, 20, 25, 0.85);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 2.5rem;
+        width: 100%;
+        max-width: 420px;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+    }
 
-            .login-card {
-                background: rgba(20, 20, 25, 0.85);
-                backdrop-filter: blur(10px);
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 16px;
-                padding: 2.5rem;
-                width: 100%;
-                max-width: 420px;
-                box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
-            }
+    .brand-title {
+        font-weight: 700;
+        letter-spacing: 1px;
+        background: linear-gradient(45deg, #ffc107, #ff9800);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
 
-            .brand-title {
-                font-weight: 700;
-                letter-spacing: 1px;
-                background: linear-gradient(45deg, #ffc107, #ff9800);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-            }
+    .form-control-custom {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #fff;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
 
-            .form-control-custom {
-                background: rgba(255, 255, 255, 0.05);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                color: #fff;
-                padding: 0.75rem 1rem;
-                border-radius: 8px;
-                transition: all 0.3s ease;
-            }
+    .form-control-custom:focus {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: #ff9800;
+        box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.2);
+        color: #fff;
+    }
 
-            .form-control-custom:focus {
-                background: rgba(255, 255, 255, 0.08);
-                border-color: #ff9800;
-                box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.2);
-                color: #fff;
-            }
+    .btn-login {
+        background: linear-gradient(45deg, #ff9800, #e65100);
+        border: none;
+        color: #fff;
+        padding: 0.75rem;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: transform 0.2s, opacity 0.2s;
+    }
 
-            .btn-login {
-                background: linear-gradient(45deg, #ff9800, #e65100);
-                border: none;
-                color: #fff;
-                padding: 0.75rem;
-                font-weight: 600;
-                border-radius: 8px;
-                transition: transform 0.2s, opacity 0.2s;
-            }
+    .btn-login:hover {
+        opacity: 0.9;
+        color: #fff;
+    }
 
-            .btn-login:hover {
-                opacity: 0.9;
-                color: #fff;
-            }
+    .btn-login:active {
+        transform: scale(0.98);
+    }
 
-            .btn-login:active {
-                transform: scale(0.98);
-            }
+    .text-muted-custom {
+        color: #a0a0aa;
+        font-size: 0.875rem;
+    }
 
-            .text-muted-custom {
-                color: #a0a0aa;
-                font-size: 0.875rem;
-            }
+    .validation-error {
+        font-size: 0.8rem;
+        color: #ef4444;
+        margin-top: 0.25rem;
+        display: block;
+    }
+</style>
 
-            .validation-error {
-                font-size: 0.8rem;
-                color: #ef4444;
-                margin-top: 0.25rem;
-                display: block;
-            }
-    </style>
-</head>
-<body>
-
+<div class="auth-wrapper">
     <div class="login-card text-center">
-        <h2 class="brand-title mb-1">EMPÓRIO GEGE</h2>
+        <h2 class="brand-title mb-1">PENDURAI</h2>
         <p class="text-muted-custom mb-4">Gestão Integrada & PDV</p>
 
         @if (!string.IsNullOrEmpty(Model.MensagemErro))
@@ -125,14 +112,15 @@
         </form>
 
         <div class="mt-4">
-            <a href="/" class="text-decoration-none text-muted-custom" style="transition: color 0.2s;" onmouseover="this.style.color='#ff9800'" onmouseout="this.style.color='#a0a0aa'">
+            <a asp-page="/Index" class="text-decoration-none text-muted-custom" style="transition: color 0.2s;" onmouseover="this.style.color='#ff9800'" onmouseout="this.style.color='#a0a0aa'">
                 ← Voltar para o site institucional
             </a>
         </div>
     </div>
+</div>
 
-    <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
-    <script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
-</body>
-</html>
+@* Engenharia de Software: Injeta os scripts de validação no local correto do seu _Layout sem duplicar código *@
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
+}
