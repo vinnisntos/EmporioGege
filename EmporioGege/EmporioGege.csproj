@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -7,14 +7,17 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Pages\Estoque\" />
-    <Folder Include="Pages\Clientes\" />
-    <Folder Include="Pages\Admin\" />
-    <Folder Include="Pages\PDV\" />
+    <PackageReference Include="supabase-csharp" Version="0.16.2" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="supabase-csharp" Version="0.16.2" />
+    <Folder Include="Pages\Admin\Estoque\" />
+    <Folder Include="Pages\Admin\Clientes\" />
+    <Folder Include="Pages\Admin\Funcionarios\" />
+    <Folder Include="Pages\Admin\Comandas\" />
+    <Folder Include="Pages\Caixa\Comandas\" />
+    <Folder Include="Pages\Caixa\Turno\" />
+    <Folder Include="Pages\SuperAdmin\Adegas\" />
   </ItemGroup>
 
 </Project>
