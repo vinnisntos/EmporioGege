@@ -1,47 +1,48 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Supabase;
-using System;
-using System.Threading.Tasks;
+using EmporioGege.Application.DTOs;
+using EmporioGege.Core.Interfaces;
 
 namespace EmporioGege.Pages.Admin
 {
     [Authorize(Policy = "AdminOnly")] // Camada de defesa 2: Proteção explícita no endpoint além da pasta
-    public class IndexModel : PageModel
+    public class IndexModel(IDashboardService dashboardService, ILogger<IndexModel> logger) : PageModel
     {
-        private readonly Client _supabaseClient;
-
-        public IndexModel(Client supabaseClient)
-        {
-            _supabaseClient = supabaseClient;
-        }
-
         // Propriedades fortemente tipadas para o painel de UX
         public decimal FaturamentoHoje { get; set; }
         public decimal FiadoPendenteTotal { get; set; }
         public int AlertasEstoqueCritico { get; set; }
         public int ComandasAtivasContador { get; set; }
 
-        public async Task<IActionResult> OnGetAsync()
+        public DashboardResumoDto ResumoMes { get; set; } = new(0, 0, 0, null, 0);
+        public IReadOnlyList<ProdutoValidadeDto> ProdutosProximosValidade { get; set; } = [];
+
+        public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         {
             try
             {
-                // Engenharia de Software: Aqui faremos as chamadas agregadas ao Supabase.
-                // Exemplo futuro: 
-                // var response = await _supabaseClient.From<Venda>().Where(x => x.Data == DateTime.Today).Get();
+                var hoje = DateTime.UtcNow.Date;
+                var inicioMes = new DateTime(hoje.Year, hoje.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+                var proximoMes = inicioMes.AddMonths(1);
 
-                // Dados estáticos temporários para a interface não nascer vazia no primeiro build
-                FaturamentoHoje = 1845.50m;
-                FiadoPendenteTotal = 3420.00m;
-                AlertasEstoqueCritico = 4;
-                ComandasAtivasContador = 7;
+                var resumoHoje = await dashboardService.ObterResumoAsync(hoje, hoje.AddDays(1), ct);
+                FaturamentoHoje = resumoHoje.Faturamento;
+
+                ResumoMes = await dashboardService.ObterResumoAsync(inicioMes, proximoMes, ct);
+                FiadoPendenteTotal = await dashboardService.ObterFiadoPendenteTotalAsync(ct);
+                AlertasEstoqueCritico = await dashboardService.ContarProdutosEstoqueCriticoAsync(ct);
+                ComandasAtivasContador = await dashboardService.ContarComandasAtivasAsync(ct);
+                ProdutosProximosValidade = await dashboardService.ListarProdutosProximosValidadeAsync(30, ct);
 
                 return Page();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Cybersecurity: Nunca exponha a stack trace do banco de dados na tela do usuário.
+                // Cybersecurity: Nunca exponha a stack trace do banco de dados na tela do usuário
+                // — mas logar o erro de verdade, senão qualquer falha aqui vira um /Error mudo
+                // sem nenhum rastro pra investigar depois.
+                logger.LogError(ex, "Falha ao carregar o dashboard administrativo.");
                 return RedirectToPage("/Error");
             }
         }

@@ -30,6 +30,12 @@ namespace EmporioGege.Models
         [Column("estoque_minimo")]
         public int EstoqueMinimo { get; set; }
 
+        [Column("unidade_medida")]
+        public string UnidadeMedida { get; set; } = "Un";
+
+        [Column("quantidade_por_caixa")]
+        public int QuantidadePorCaixa { get; set; } = 1;
+
         [Column("data_validade")]
         public DateTime? DataValidade { get; set; }
 
