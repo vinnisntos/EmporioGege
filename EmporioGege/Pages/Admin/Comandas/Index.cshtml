@@ -1,0 +1,139 @@
+@page
+@model EmporioGege.Pages.Admin.Comandas.IndexModel
+@{
+    ViewData["Title"] = "Comandas";
+}
+
+<style>
+    .badge-status-aberta { background: rgba(255, 193, 7, .15); color: #ffc107; border: 1px solid rgba(255, 193, 7, .4); }
+    .badge-status-fechada { background: rgba(25, 135, 84, .15); color: #52d489; border: 1px solid rgba(25, 135, 84, .4); }
+    .badge-status-cancelada { background: rgba(108, 117, 125, .2); color: #adb5bd; border: 1px solid rgba(108, 117, 125, .4); }
+    .linha-itens-comanda td { background: rgba(255, 255, 255, .02); }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-0 text-white fw-bold">Comandas</h1>
+        <p class="text-muted small mb-0">Supervisão de todas as comandas da loja (abertas, fechadas e canceladas).</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.MensagemSucesso))
+{
+    <div class="alert alert-success">@Model.MensagemSucesso</div>
+}
+@if (!string.IsNullOrEmpty(Model.MensagemErro))
+{
+    <div class="alert alert-danger">@Model.MensagemErro</div>
+}
+
+<div class="card card-custom p-3">
+    @if (Model.Comandas.Count == 0)
+    {
+        <p class="text-muted text-center py-4 mb-0">Nenhuma comanda registrada ainda.</p>
+    }
+    else
+    {
+        <table class="table table-dark table-borderless align-middle mb-0">
+            <thead>
+                <tr class="text-muted small text-uppercase">
+                    <th>Comanda</th>
+                    <th>Status</th>
+                    <th>Aberta em</th>
+                    <th>Atualizada em</th>
+                    <th class="text-center">Itens</th>
+                    <th class="text-end">Total</th>
+                    <th style="width:220px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var c in Model.Comandas)
+                {
+                    var badgeClasse = c.Status switch
+                    {
+                        "ABERTA" => "badge-status-aberta",
+                        "FECHADA" => "badge-status-fechada",
+                        _ => "badge-status-cancelada"
+                    };
+                    <tr data-comanda-id="@c.Id">
+                        <td class="text-white fw-medium">@c.NumeroComanda</td>
+                        <td><span class="badge @badgeClasse">@c.Status</span></td>
+                        <td class="text-muted small">@c.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                        <td class="text-muted small">@c.AtualizadoEm.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                        <td class="text-center">@c.QuantidadeItens</td>
+                        <td class="text-end">@c.Total.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))</td>
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end align-items-center gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-light btn-ver-itens">
+                                    <i class="bi bi-list-ul me-1"></i>Ver itens
+                                </button>
+                                @if (c.Status == "ABERTA")
+                                {
+                                    <form method="post" asp-page-handler="Cancelar" asp-route-id="@c.Id"
+                                          onsubmit="return confirm('Cancelar a comanda @c.NumeroComanda? Essa ação não pode ser desfeita.');">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Cancelar</button>
+                                    </form>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                    <tr class="linha-itens-comanda" style="display:none;">
+                        <td colspan="7">
+                            <div class="itens-comanda-conteudo text-muted small py-2">Carregando...</div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+<script>
+(function () {
+    function formatarMoeda(valor) {
+        return (valor ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    function escapeHtml(texto) {
+        const div = document.createElement('div');
+        div.textContent = texto ?? '';
+        return div.innerHTML;
+    }
+
+    document.querySelectorAll('.btn-ver-itens').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const linhaPrincipal = btn.closest('tr');
+            const linhaItens = linhaPrincipal.nextElementSibling;
+            const conteudo = linhaItens.querySelector('.itens-comanda-conteudo');
+            const comandaId = linhaPrincipal.dataset.comandaId;
+
+            const aberta = linhaItens.style.display !== 'none';
+            if (aberta) {
+                linhaItens.style.display = 'none';
+                return;
+            }
+
+            linhaItens.style.display = 'table-row';
+            conteudo.textContent = 'Carregando...';
+
+            try {
+                const resposta = await fetch(`/Admin/Comandas?handler=Detalhe&id=${comandaId}`);
+                const dados = await resposta.json();
+                if (!resposta.ok || !dados.sucesso || dados.comanda.itens.length === 0) {
+                    conteudo.textContent = 'Nenhum item lançado nesta comanda.';
+                    return;
+                }
+
+                conteudo.innerHTML = dados.comanda.itens.map(i => `
+                    <div class="d-flex justify-content-between py-1 border-bottom border-secondary border-opacity-25">
+                        <span>${escapeHtml(i.produtoNome)} <span class="text-muted">x${i.quantidade}</span></span>
+                        <span>${formatarMoeda(i.subtotal)}</span>
+                    </div>
+                `).join('');
+            } catch {
+                conteudo.textContent = 'Falha ao carregar os itens.';
+            }
+        });
+    });
+})();
+</script>

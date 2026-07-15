@@ -7,6 +7,7 @@ using Supabase;
 using EmporioGege.Application.Services;
 using EmporioGege.Core.Enums;
 using EmporioGege.Core.Interfaces;
+using EmporioGege.Infrastructure.Auth;
 using EmporioGege.Infrastructure.Data;
 using EmporioGege.Infrastructure.Tenancy;
 using EmporioGege.Infrastructure.Webhooks;
@@ -36,6 +37,9 @@ builder.Services.AddScoped<ICatalogoService, CatalogoService>();
 builder.Services.AddScoped<IProdutoService, ProdutoService>();
 builder.Services.AddScoped<IFuncionarioService, FuncionarioService>();
 builder.Services.AddScoped<IClienteService, ClienteService>();
+builder.Services.AddScoped<IComandaService, ComandaService>();
+builder.Services.AddScoped<ISupervisorAutorizacaoService, SupervisorAutorizacaoService>();
+builder.Services.AddScoped<ITenantService, TenantService>();
 
 // 1.2 Permite validar o antiforgery token via header em chamadas AJAX/fetch (PDV),
 // já que essas requisições não enviam o campo de formulário __RequestVerificationToken.

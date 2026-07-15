@@ -69,7 +69,12 @@ namespace EmporioGege.Application.Services
 
                     var vendaId = Guid.NewGuid();
                     var dataVenda = DateTime.UtcNow;
-                    var tipoOrigemTexto = dto.TipoOrigem == TipoOrigemVenda.ZeDelivery ? "ZEDELIVERY" : "BALCAO";
+                    var tipoOrigemTexto = dto.TipoOrigem switch
+                    {
+                        TipoOrigemVenda.ZeDelivery => "ZEDELIVERY",
+                        TipoOrigemVenda.Comanda => "COMANDA",
+                        _ => "BALCAO"
+                    };
 
                     await connection.ExecuteAsync(new CommandDefinition(
                         """
@@ -120,6 +125,20 @@ namespace EmporioGege.Application.Services
                     {
                         var lancamento = new LancamentoLedgerDto(turnoId, totalVenda, TipoOperacaoLedger.Credito, $"Venda {vendaId}");
                         await LedgerOperacoes.AdicionarAsync(connection, transaction, tenantId, lancamento, ct);
+                    }
+
+                    // Fechamento de comanda vira venda: marca a comanda FECHADA na MESMA
+                    // transação da venda — se a comanda já não estiver mais ABERTA (fechada ou
+                    // cancelada por outra requisição concorrente), a venda inteira reverte junto
+                    // em vez de gravar uma venda "órfã" de uma comanda que já não existe mais.
+                    if (dto.ComandaId is { } comandaIdFechada)
+                    {
+                        var linhasComanda = await connection.ExecuteAsync(new CommandDefinition(
+                            "UPDATE comandas SET status = 'FECHADA', atualizado_em = now() WHERE id = @ComandaId AND tenant_id = @TenantId AND status = 'ABERTA'",
+                            new { ComandaId = comandaIdFechada, TenantId = tenantId }, transaction, cancellationToken: ct));
+
+                        if (linhasComanda == 0)
+                            throw new InvalidOperationException($"Comanda {comandaIdFechada} não está aberta ou não existe.");
                     }
 
                     await transaction.CommitAsync(ct);

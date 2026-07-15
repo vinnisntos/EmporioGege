@@ -52,7 +52,12 @@ namespace EmporioGege.Application.Services
                     new { NovoEstoque = novoEstoque, TenantId = tenantId, dto.ProdutoId },
                     transaction, cancellationToken: ct));
 
-            var origemDescricao = dto.TipoOrigem == TipoOrigemVenda.ZeDelivery ? "ZEDELIVERY" : "BALCAO";
+            var origemDescricao = dto.TipoOrigem switch
+            {
+                TipoOrigemVenda.ZeDelivery => "ZEDELIVERY",
+                TipoOrigemVenda.Comanda => "COMANDA",
+                _ => "BALCAO"
+            };
             var justificativa = dto.ReferenciaExterna is null
                 ? $"Origem: {origemDescricao}"
                 : $"Origem: {origemDescricao} | Ref: {dto.ReferenciaExterna}";

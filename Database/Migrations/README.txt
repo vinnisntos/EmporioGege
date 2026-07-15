@@ -88,6 +88,26 @@ como no processador de webhook).
     quebraria o histórico de vendas, já que vendas_itens.produto_id
     referencia produtos sem cascade).
 
+0008_comandas_itens.sql
+  - comandas_itens: staging do consumo de uma comanda ABERTA (o que foi
+    lançado, ainda sem baixar estoque nem virar venda).
+  - comandas.atualizado_em: quando a comanda mudou de status.
+  - Índice único parcial (tenant_id, numero_comanda) WHERE status =
+    'ABERTA': no máximo 1 comanda aberta por número/tenant (mesmo
+    padrão da 0002, mas por número em vez de por usuário).
+  - RLS ligado em comandas_itens, sem policy (só acessada via Dapper).
+
+0009_dados_teste_comandas.sql
+  - Dados de apoio SÓ PRA AMBIENTE DE TESTE (não é schema): insere um
+    produto de teste no tenant do usuário caixa01@emporiogege.com (pra
+    dar pra testar adicionar-item/fechar-comanda) e vincula perfis
+    superadmin sem tenant_id a esse mesmo tenant (só pra destravar
+    telas Admin/* durante teste manual - ver nota de reversão no
+    próprio arquivo da migration).
+  - Credenciais de teste (caixa01, sem senha de superadmin) ficam em
+    Database/Migrations/CREDENCIAIS_TESTE.local.txt - arquivo local,
+    no .gitignore, NUNCA commitado. Peça a quem já rodou os testes.
+
 
 3. FUNCIONALIDADES ENTREGUES
 ================================================================
@@ -136,6 +156,43 @@ Cliente / Fiado (Pages/Admin/Clientes)
   - Registrar pagamento (abate o saldo devedor).
   - Limite de crédito é checado atomicamente na mesma transação da
     venda fiado - nunca deixa o cliente passar do limite.
+
+Comandas (Pages/Caixa/Comandas e Pages/Admin/Comandas)
+  - Abertura por número/mesa (impede duplicar número enquanto ABERTA),
+    consumo incremental (itens ficam em comandas_itens, sem baixar
+    estoque ainda) e fechamento, que vira uma venda de verdade (baixa
+    de estoque + vendas/vendas_itens + ledger/fiado) reaproveitando o
+    mesmo VendaService atômico do PDV - a comanda é marcada FECHADA na
+    MESMA transação da venda.
+  - Cancelamento (comanda sem consumo, não vira venda).
+  - Autorização de supervisor: vendedor só cancela comanda ou remove
+    item já lançado com login de um administrador/superadmin digitado
+    na hora (SupervisorAutorizacaoService, mesmo mecanismo do login,
+    sem trocar a sessão do caixa). Administrador/superadmin fazem as
+    duas ações livremente.
+  - Admin/Comandas é supervisão: histórico completo (abertas, fechadas,
+    canceladas), ver itens, e cancelar comanda travada aberta sem
+    precisar de senha (a policy AdminOnly já garante quem chega lá).
+
+Cadastro de Lojas / Gestão de Contexto (Pages/SuperAdmin/Adegas)
+  - CRUD de tenant (loja): nome fantasia, responsável, CNPJ, contatos,
+    status de licença, data de expiração. Antes só dava pra criar via
+    SQL direto.
+  - "Entrar" numa loja: grava as claims ImpersonatedTenantId/Nome no
+    próprio cookie do superadmin (SignInAsync de novo, mesmo scheme -
+    não troca de usuário nem afeta sessão de mais ninguém) e passa a
+    resolver TenantId por essa claim (HttpContextTenantProvider,
+    checada antes da claim TenantId normal). Isso destrava todas as
+    telas Admin/*/Caixa/* pra aquele tenant específico sem precisar de
+    conta administrador nele - inclusive dá pra criar o primeiro
+    administrador de uma loja nova via Admin/Funcionarios normalmente,
+    já "dentro" do contexto dela.
+  - Banner "Modo Loja: {nome}" fixo no topo (_Layout.cshtml) enquanto
+    impersonando, com botão "Sair do modo loja" que reemite o cookie
+    sem as claims - funciona de qualquer página do sistema.
+  - Segurança: só quem já passou pela policy SuperAdminOnly consegue
+    gravar essa claim (o handler que assina o cookie é gated por ela);
+    administrador/vendedor não tem como forjar acesso a outro tenant.
 
 Integração Zé Delivery (webhook)
   - Endpoint público POST /webhooks/zedelivery/{token}, autenticado
@@ -234,11 +291,9 @@ conferência direto no banco) - nenhum aparecia só com "dotnet build".
 - NFC-e real: hoje só existe um flag "emitir_nota_fiscal" (marcação
   interna). Não emite nota fiscal de verdade - falta escolher um
   provedor (Focus NFe / eNotas / PlugNotas) e integrar.
-- Comandas: schema e contador no dashboard existem, mas não há tela
-  de abertura/consumo/fechamento de comanda (Admin/Comandas e
-  Caixa/Comandas ainda vazias).
-- SuperAdmin/Adegas: cadastro de uma loja (tenant) nova só é possível
-  via SQL direto, não tem tela.
+- Bloqueio de login por status_licenca/data_expiracao do tenant: os
+  campos existem e são editáveis em SuperAdmin/Adegas, mas nada ainda
+  impede login de um tenant "suspenso"/"cancelado"/expirado.
 - Emissão/impressão de recibo pro cliente na hora da venda.
 - Testes automatizados (nenhum criado até agora).
 - Proteção contra força bruta no login.

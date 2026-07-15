@@ -6,6 +6,9 @@
 # dotenv files
 .env
 
+# Credenciais de teste locais — nunca commitar (ver Database/Migrations/README.txt)
+*.local.txt
+
 # User-specific files
 *.rsuser
 *.suo

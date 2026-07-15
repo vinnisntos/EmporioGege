@@ -13,7 +13,18 @@ namespace EmporioGege.Infrastructure.Tenancy
                 if (ambientTenantContext.TenantId is { } tenantDoEscopoAmbiente)
                     return tenantDoEscopoAmbiente;
 
-                var claimValue = httpContextAccessor.HttpContext?.User.FindFirst("TenantId")?.Value;
+                var usuario = httpContextAccessor.HttpContext?.User;
+
+                // Superadmin "puro" não tem TenantId (claim vazia) — mas pode ter "entrado"
+                // no contexto de uma loja específica via SuperAdmin/Adegas (Entrar), o que
+                // grava a claim ImpersonatedTenantId no mesmo cookie assinado. Só superadmin
+                // consegue gravar essa claim (handler gated por SuperAdminOnly), então não dá
+                // pra um administrador/vendedor forjar acesso a outro tenant por aqui.
+                var claimImpersonada = usuario?.FindFirst("ImpersonatedTenantId")?.Value;
+                if (Guid.TryParse(claimImpersonada, out var tenantImpersonado))
+                    return tenantImpersonado;
+
+                var claimValue = usuario?.FindFirst("TenantId")?.Value;
                 return Guid.TryParse(claimValue, out var tenantId) ? tenantId : null;
             }
         }

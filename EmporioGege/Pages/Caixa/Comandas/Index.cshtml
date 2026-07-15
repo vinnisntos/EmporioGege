@@ -1,0 +1,548 @@
+@page
+@using System.Text.Json
+@model EmporioGege.Pages.Caixa.Comandas.IndexModel
+@{
+    ViewData["Title"] = "Comandas";
+    var opcoesJson = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    var catalogoJson = JsonSerializer.Serialize(Model.Produtos, opcoesJson);
+    var precosJson = JsonSerializer.Serialize(Model.PrecosDiferenciados, opcoesJson);
+    var comandasJson = JsonSerializer.Serialize(Model.ComandasAbertas, opcoesJson);
+    var souSupervisorJson = JsonSerializer.Serialize(Model.DispensaAutorizacaoSupervisor);
+}
+
+<style>
+    #comandas-wrapper { display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; align-items: start; }
+
+    #lista-comandas { display: flex; flex-direction: column; gap: .6rem; max-height: 75vh; overflow-y: auto; }
+    .comanda-card {
+        cursor: pointer; padding: .75rem 1rem; border-radius: 10px;
+        border: 1px solid rgba(255,255,255,.08); background: rgba(20,20,25,.6); transition: all .15s ease;
+    }
+    .comanda-card:hover { border-color: rgba(255,193,7,.4); }
+    .comanda-card.ativa { border-color: #ffc107; background: rgba(255,193,7,.08); }
+    .comanda-card .numero { font-weight: 600; color: #fff; }
+    .comanda-card .meta { font-size: .78rem; color: #9a9aa5; }
+
+    #sugestoes-produto-comanda {
+        position: absolute; z-index: 20; width: 100%; max-height: 260px; overflow-y: auto;
+        background: #17171d; border: 1px solid rgba(255,255,255,.08); border-radius: .5rem;
+        margin-top: .25rem; display: none;
+    }
+    #sugestoes-produto-comanda .item-sugestao { padding: .6rem 1rem; cursor: pointer; }
+    #sugestoes-produto-comanda .item-sugestao:hover, #sugestoes-produto-comanda .item-sugestao.ativo { background: rgba(255,193,7,.1); }
+
+    .total-comanda { font-size: 1.8rem; font-weight: 700; color: #ffc107; }
+
+    .modal-supervisor-overlay {
+        position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 1090;
+        display: none; align-items: center; justify-content: center;
+    }
+    .modal-supervisor-box { width: 360px; }
+
+    #toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 1080; }
+</style>
+
+@if (Model.SemTenant)
+{
+    <div class="alert alert-warning">
+        Este usuário não está vinculado a uma loja (tenant). Comandas só podem ser operadas por usuários de uma loja específica.
+    </div>
+    return;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="bi bi-receipt me-2"></i>Comandas</h4>
+    <div class="d-flex gap-2">
+        <input type="text" id="novo-numero-comanda" class="form-control form-control-sm" placeholder="Número/mesa..." style="width:180px;" />
+        <button type="button" id="btn-abrir-comanda" class="btn btn-sm btn-warning fw-semibold">
+            <i class="bi bi-plus-lg me-1"></i>Abrir comanda
+        </button>
+    </div>
+</div>
+
+<div id="comandas-wrapper">
+    <div id="lista-comandas">
+        <div id="lista-comandas-vazia" class="text-muted small text-center py-4">Nenhuma comanda aberta.</div>
+    </div>
+
+    <div class="card-custom p-3" id="painel-comanda">
+        <div id="painel-vazio" class="text-center text-muted py-5">
+            Selecione uma comanda à esquerda ou abra uma nova.
+        </div>
+
+        <div id="painel-conteudo" style="display:none;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0" id="painel-titulo">Comanda</h5>
+                <button type="button" id="btn-cancelar-comanda" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-x-circle me-1"></i>Cancelar comanda
+                </button>
+            </div>
+
+            <div class="position-relative mb-3">
+                <input type="text" id="busca-produto-comanda" class="form-control" autocomplete="off"
+                       placeholder="Bipar código de barras ou buscar por nome..." />
+                <div id="sugestoes-produto-comanda"></div>
+            </div>
+
+            <table class="table table-dark table-borderless align-middle mb-3">
+                <thead>
+                    <tr class="text-muted small text-uppercase">
+                        <th>Produto</th>
+                        <th class="text-center" style="width:70px;">Un/Cx</th>
+                        <th class="text-center" style="width:70px;">Qtd.</th>
+                        <th class="text-end" style="width:110px;">Preço</th>
+                        <th class="text-end" style="width:110px;">Subtotal</th>
+                        <th style="width:40px;"></th>
+                    </tr>
+                </thead>
+                <tbody id="itens-comanda-corpo">
+                    <tr id="itens-comanda-vazio">
+                        <td colspan="6" class="text-center text-muted py-4">Nenhum item lançado ainda.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="text-muted">Total</span>
+                <span class="total-comanda" id="total-comanda">R$ 0,00</span>
+            </div>
+
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <label class="form-label small text-muted">Método de pagamento</label>
+                    <select id="metodo-pagamento-comanda" class="form-select">
+                        <option value="DINHEIRO">Dinheiro</option>
+                        <option value="DEBITO">Cartão de Débito</option>
+                        <option value="CREDITO">Cartão de Crédito</option>
+                        <option value="PIX">Pix</option>
+                        <option value="FIADO">Fiado (PendurAi)</option>
+                    </select>
+                </div>
+                <div class="col-6" id="bloco-cliente-fiado-comanda" style="display:none;">
+                    <label class="form-label small text-muted">Cliente</label>
+                    <select id="cliente-fiado-comanda" class="form-select">
+                        <option value="">Selecione...</option>
+                        @foreach (var c in Model.Clientes)
+                        {
+                            <option value="@c.Id">@c.Nome</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="emitir-nota-comanda" checked>
+                <label class="form-check-label small text-muted" for="emitir-nota-comanda">Emitir nota fiscal</label>
+            </div>
+
+            <button type="button" id="btn-fechar-comanda" class="btn btn-warning w-100 fw-semibold py-2">
+                Fechar comanda / Cobrar
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="modal-supervisor-overlay" class="modal-supervisor-overlay">
+    <div class="modal-supervisor-box card-custom p-3">
+        <h5 class="mb-1"><i class="bi bi-shield-lock me-2"></i>Autorização necessária</h5>
+        <p class="text-muted small">Essa ação exige login de um administrador ou superadmin.</p>
+        <div class="mb-2">
+            <label class="form-label small">E-mail do supervisor</label>
+            <input type="email" id="supervisor-email" class="form-control" autocomplete="off" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label small">Senha</label>
+            <input type="password" id="supervisor-senha" class="form-control" autocomplete="off" />
+        </div>
+        <div class="d-flex justify-content-end gap-2">
+            <button type="button" id="btn-cancelar-supervisor" class="btn btn-outline-light btn-sm">Cancelar</button>
+            <button type="button" id="btn-confirmar-supervisor" class="btn btn-warning btn-sm fw-semibold">Autorizar</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast-container"></div>
+
+@Html.AntiForgeryToken()
+
+<script>
+(function () {
+    const catalogo = @Html.Raw(catalogoJson);
+    const precosDiferenciados = @Html.Raw(precosJson);
+    const souSupervisor = @Html.Raw(souSupervisorJson);
+    const antiforgeryToken = document.querySelector('input[name="__RequestVerificationToken"]').value;
+
+    const comandas = new Map(); // id -> resumo { id, numeroComanda, status, createdAt, total, quantidadeItens }
+    (@Html.Raw(comandasJson)).forEach(c => comandas.set(c.id, c));
+
+    let comandaAtivaId = null;
+    let itensComandaAtiva = [];
+    let acaoPendenteAutorizacao = null;
+
+    function formatarMoeda(valor) {
+        return (valor ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    // Nome de produto/comanda é texto livre — sem isso, um cadastro malicioso
+    // executaria via innerHTML aqui igual ao PDV (Caixa/Index.cshtml).
+    function escapeHtml(texto) {
+        const div = document.createElement('div');
+        div.textContent = texto ?? '';
+        return div.innerHTML;
+    }
+
+    function mostrarToast(mensagem, tipo) {
+        const cor = tipo === 'erro' ? 'bg-danger' : tipo === 'aviso' ? 'bg-warning text-dark' : 'bg-success';
+        const toast = document.createElement('div');
+        toast.className = `toast align-items-center text-white ${cor} border-0 mb-2 show`;
+        toast.innerHTML = `<div class="d-flex"><div class="toast-body">${escapeHtml(mensagem)}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" aria-label="Fechar"></button></div>`;
+        toast.querySelector('.btn-close').addEventListener('click', () => toast.remove());
+        document.getElementById('toast-container').appendChild(toast);
+        setTimeout(() => toast.remove(), 5000);
+    }
+
+    async function postJson(url, payload) {
+        const resposta = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': antiforgeryToken },
+            body: JSON.stringify(payload ?? {})
+        });
+        const resultado = await resposta.json().catch(() => ({}));
+        return { ok: resposta.ok, resultado };
+    }
+
+    // --- lista de comandas abertas ---
+    const listaEl = document.getElementById('lista-comandas');
+    const listaVaziaEl = document.getElementById('lista-comandas-vazia');
+
+    function renderizarLista() {
+        listaEl.querySelectorAll('.comanda-card').forEach(el => el.remove());
+        if (comandas.size === 0) {
+            listaVaziaEl.style.display = 'block';
+            return;
+        }
+        listaVaziaEl.style.display = 'none';
+        [...comandas.values()]
+            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+            .forEach(c => {
+                const div = document.createElement('div');
+                div.className = 'comanda-card' + (c.id === comandaAtivaId ? ' ativa' : '');
+                div.innerHTML = `
+                    <div class="numero">${escapeHtml(c.numeroComanda)}</div>
+                    <div class="meta">${c.quantidadeItens} ${c.quantidadeItens === 1 ? 'item' : 'itens'} · ${formatarMoeda(c.total)}</div>
+                `;
+                div.addEventListener('click', () => selecionarComanda(c.id));
+                listaEl.appendChild(div);
+            });
+    }
+
+    // --- painel da comanda ativa ---
+    const painelVazio = document.getElementById('painel-vazio');
+    const painelConteudo = document.getElementById('painel-conteudo');
+    const painelTitulo = document.getElementById('painel-titulo');
+    const itensCorpo = document.getElementById('itens-comanda-corpo');
+    const itensVazioRow = document.getElementById('itens-comanda-vazio');
+    const totalComandaEl = document.getElementById('total-comanda');
+    const buscaInput = document.getElementById('busca-produto-comanda');
+    const sugestoesEl = document.getElementById('sugestoes-produto-comanda');
+    const metodoPagamentoSelect = document.getElementById('metodo-pagamento-comanda');
+    const blocoClienteFiado = document.getElementById('bloco-cliente-fiado-comanda');
+    const clienteFiadoSelect = document.getElementById('cliente-fiado-comanda');
+    const emitirNotaCheckbox = document.getElementById('emitir-nota-comanda');
+    const btnFechar = document.getElementById('btn-fechar-comanda');
+    const btnCancelar = document.getElementById('btn-cancelar-comanda');
+
+    metodoPagamentoSelect.addEventListener('change', () => {
+        blocoClienteFiado.style.display = metodoPagamentoSelect.value === 'FIADO' ? 'block' : 'none';
+    });
+
+    async function selecionarComanda(id) {
+        comandaAtivaId = id;
+        renderizarLista();
+        painelVazio.style.display = 'none';
+        painelConteudo.style.display = 'block';
+
+        const resposta = await fetch(`/Caixa/Comandas?handler=Detalhe&id=${id}`);
+        const dados = await resposta.json().catch(() => null);
+        if (!resposta.ok || !dados?.sucesso) {
+            mostrarToast(dados?.mensagem ?? 'Não foi possível carregar a comanda.', 'erro');
+            return;
+        }
+
+        painelTitulo.textContent = `Comanda ${dados.comanda.numeroComanda}`;
+        itensComandaAtiva = dados.comanda.itens;
+        renderizarItens();
+        buscaInput.focus();
+    }
+
+    function renderizarItens() {
+        itensCorpo.innerHTML = '';
+        if (itensComandaAtiva.length === 0) {
+            itensCorpo.appendChild(itensVazioRow);
+            totalComandaEl.textContent = formatarMoeda(0);
+            return;
+        }
+
+        let total = 0;
+        itensComandaAtiva.forEach(item => {
+            total += item.subtotal;
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${escapeHtml(item.produtoNome)}</td>
+                <td class="text-center small text-muted">${item.tipoPreco === 'CAIXA' ? 'Cx' : 'Un'}</td>
+                <td class="text-center">${item.quantidade}</td>
+                <td class="text-end">${formatarMoeda(item.precoUnitarioAplicado)}</td>
+                <td class="text-end">${formatarMoeda(item.subtotal)}</td>
+                <td><button type="button" class="btn btn-sm btn-outline-danger btn-remover-item"><i class="bi bi-trash"></i></button></td>
+            `;
+            tr.querySelector('.btn-remover-item').addEventListener('click', () => removerItem(item.id));
+            itensCorpo.appendChild(tr);
+        });
+        totalComandaEl.textContent = formatarMoeda(total);
+    }
+
+    function atualizarResumoComandaAtiva() {
+        const resumo = comandas.get(comandaAtivaId);
+        if (!resumo) return;
+        resumo.quantidadeItens = itensComandaAtiva.length;
+        resumo.total = itensComandaAtiva.reduce((soma, i) => soma + i.subtotal, 0);
+        renderizarLista();
+    }
+
+    // --- busca/adicionar item (mesmo padrão de sugestão do PDV, Caixa/Index.cshtml) ---
+    let sugestaoAtiva = -1;
+
+    function buscarSugestoes(termo) {
+        const termoLimpo = termo.trim().toLowerCase();
+        if (!termoLimpo) return [];
+        return catalogo.filter(p =>
+            (p.codigoBarras && p.codigoBarras.toLowerCase() === termoLimpo) ||
+            p.nome.toLowerCase().includes(termoLimpo)
+        ).slice(0, 8);
+    }
+
+    function renderizarSugestoes(itens) {
+        sugestaoAtiva = -1;
+        if (itens.length === 0) {
+            sugestoesEl.style.display = 'none';
+            sugestoesEl.innerHTML = '';
+            return;
+        }
+        sugestoesEl.innerHTML = itens.map((p, i) =>
+            `<div class="item-sugestao" data-index="${i}" data-id="${p.id}">
+                <div class="fw-semibold">${escapeHtml(p.nome)}</div>
+                <div class="small text-muted">${escapeHtml(p.codigoBarras) || 'sem código'} · ${formatarMoeda(p.precoVendaBase)} · estoque: ${p.estoqueAtual}</div>
+            </div>`
+        ).join('');
+        sugestoesEl.style.display = 'block';
+        [...sugestoesEl.querySelectorAll('.item-sugestao')].forEach(el => {
+            el.addEventListener('click', () => {
+                adicionarItem(el.dataset.id);
+                buscaInput.value = '';
+                sugestoesEl.style.display = 'none';
+                buscaInput.focus();
+            });
+        });
+    }
+
+    buscaInput.addEventListener('input', () => renderizarSugestoes(buscarSugestoes(buscaInput.value)));
+
+    buscaInput.addEventListener('keydown', (e) => {
+        const opcoes = sugestoesEl.querySelectorAll('.item-sugestao');
+        if (e.key === 'ArrowDown' && opcoes.length) {
+            e.preventDefault();
+            sugestaoAtiva = Math.min(sugestaoAtiva + 1, opcoes.length - 1);
+            opcoes.forEach((el, i) => el.classList.toggle('ativo', i === sugestaoAtiva));
+        } else if (e.key === 'ArrowUp' && opcoes.length) {
+            e.preventDefault();
+            sugestaoAtiva = Math.max(sugestaoAtiva - 1, 0);
+            opcoes.forEach((el, i) => el.classList.toggle('ativo', i === sugestaoAtiva));
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            const termo = buscaInput.value.trim();
+            if (!termo) return;
+
+            if (sugestaoAtiva >= 0 && opcoes[sugestaoAtiva]) {
+                adicionarItem(opcoes[sugestaoAtiva].dataset.id);
+            } else {
+                const exato = catalogo.find(p => p.codigoBarras && p.codigoBarras.toLowerCase() === termo.toLowerCase());
+                if (exato) {
+                    adicionarItem(exato.id);
+                } else if (opcoes.length === 1) {
+                    adicionarItem(opcoes[0].dataset.id);
+                } else {
+                    mostrarToast('Produto não encontrado.', 'aviso');
+                    return;
+                }
+            }
+            buscaInput.value = '';
+            sugestoesEl.style.display = 'none';
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!sugestoesEl.contains(e.target) && e.target !== buscaInput) {
+            sugestoesEl.style.display = 'none';
+        }
+    });
+
+    async function adicionarItem(produtoId) {
+        if (!comandaAtivaId) return;
+        const { ok, resultado } = await postJson('/Caixa/Comandas?handler=AdicionarItem', {
+            comandaId: comandaAtivaId, produtoId, quantidade: 1, tipoPreco: 'BALCAO'
+        });
+        if (ok && resultado.sucesso) {
+            itensComandaAtiva.push(resultado.item);
+            renderizarItens();
+            atualizarResumoComandaAtiva();
+        } else {
+            mostrarToast(resultado.mensagem ?? 'Não foi possível adicionar o item.', 'erro');
+        }
+    }
+
+    function removerItem(itemId) {
+        executarComAutorizacao(async (supervisorEmail, supervisorSenha) => {
+            const { ok, resultado } = await postJson('/Caixa/Comandas?handler=RemoverItem', {
+                comandaId: comandaAtivaId, itemId, supervisorEmail, supervisorSenha
+            });
+            if (ok && resultado.sucesso) {
+                itensComandaAtiva = itensComandaAtiva.filter(i => i.id !== itemId);
+                renderizarItens();
+                atualizarResumoComandaAtiva();
+                mostrarToast('Item removido.', 'sucesso');
+            } else {
+                mostrarToast(resultado.mensagem ?? 'Não foi possível remover o item.', 'erro');
+            }
+        });
+    }
+
+    // --- abrir comanda ---
+    document.getElementById('btn-abrir-comanda').addEventListener('click', async () => {
+        const input = document.getElementById('novo-numero-comanda');
+        const numero = input.value.trim();
+        if (!numero) {
+            mostrarToast('Informe o número/identificação da comanda.', 'aviso');
+            return;
+        }
+        const { ok, resultado } = await postJson('/Caixa/Comandas?handler=Abrir', { numeroComanda: numero });
+        if (ok && resultado.sucesso) {
+            comandas.set(resultado.comanda.id, resultado.comanda);
+            input.value = '';
+            renderizarLista();
+            selecionarComanda(resultado.comanda.id);
+            mostrarToast('Comanda aberta.', 'sucesso');
+        } else {
+            mostrarToast(resultado.mensagem ?? 'Não foi possível abrir a comanda.', 'erro');
+        }
+    });
+
+    function fecharPainel() {
+        comandaAtivaId = null;
+        itensComandaAtiva = [];
+        renderizarLista();
+        painelConteudo.style.display = 'none';
+        painelVazio.style.display = 'block';
+    }
+
+    // --- cancelar comanda ---
+    btnCancelar.addEventListener('click', () => {
+        if (!comandaAtivaId) return;
+        executarComAutorizacao(async (supervisorEmail, supervisorSenha) => {
+            const { ok, resultado } = await postJson('/Caixa/Comandas?handler=Cancelar', {
+                comandaId: comandaAtivaId, supervisorEmail, supervisorSenha
+            });
+            if (ok && resultado.sucesso) {
+                comandas.delete(comandaAtivaId);
+                fecharPainel();
+                mostrarToast('Comanda cancelada.', 'sucesso');
+            } else {
+                mostrarToast(resultado.mensagem ?? 'Não foi possível cancelar a comanda.', 'erro');
+            }
+        });
+    });
+
+    // --- fechar comanda ---
+    btnFechar.addEventListener('click', async () => {
+        if (!comandaAtivaId) return;
+        if (itensComandaAtiva.length === 0) {
+            mostrarToast('Comanda sem itens — cancele-a em vez de fechar.', 'aviso');
+            return;
+        }
+        if (metodoPagamentoSelect.value === 'FIADO' && !clienteFiadoSelect.value) {
+            mostrarToast('Selecione um cliente para venda fiado.', 'aviso');
+            return;
+        }
+
+        btnFechar.disabled = true;
+        try {
+            const { ok, resultado } = await postJson('/Caixa/Comandas?handler=Fechar', {
+                comandaId: comandaAtivaId,
+                emitirNotaFiscal: emitirNotaCheckbox.checked,
+                metodoPagamento: metodoPagamentoSelect.value,
+                clienteId: metodoPagamentoSelect.value === 'FIADO' ? clienteFiadoSelect.value : null
+            });
+            if (ok && resultado.sucesso) {
+                comandas.delete(comandaAtivaId);
+                fecharPainel();
+                mostrarToast('Comanda fechada com sucesso!', 'sucesso');
+            } else {
+                mostrarToast(resultado.mensagem ?? 'Não foi possível fechar a comanda.', 'erro');
+            }
+        } finally {
+            btnFechar.disabled = false;
+        }
+    });
+
+    // --- autorização de supervisor (overlay simples, sem depender da API JS do Bootstrap
+    // pra evitar problema de ordem de carregamento — o <script> da página roda antes do
+    // bootstrap.bundle.min.js carregado no fim do _Layout.cshtml) ---
+    const overlaySupervisor = document.getElementById('modal-supervisor-overlay');
+    const supervisorEmailInput = document.getElementById('supervisor-email');
+    const supervisorSenhaInput = document.getElementById('supervisor-senha');
+
+    function executarComAutorizacao(acaoAsync) {
+        if (souSupervisor) {
+            acaoAsync(null, null);
+            return;
+        }
+        acaoPendenteAutorizacao = acaoAsync;
+        supervisorEmailInput.value = '';
+        supervisorSenhaInput.value = '';
+        overlaySupervisor.style.display = 'flex';
+        supervisorEmailInput.focus();
+    }
+
+    function fecharModalSupervisor() {
+        overlaySupervisor.style.display = 'none';
+        acaoPendenteAutorizacao = null;
+    }
+
+    document.getElementById('btn-cancelar-supervisor').addEventListener('click', fecharModalSupervisor);
+    overlaySupervisor.addEventListener('click', (e) => {
+        if (e.target === overlaySupervisor) fecharModalSupervisor();
+    });
+
+    document.getElementById('btn-confirmar-supervisor').addEventListener('click', async () => {
+        const email = supervisorEmailInput.value.trim();
+        const senha = supervisorSenhaInput.value;
+        if (!email || !senha) {
+            mostrarToast('Informe e-mail e senha do supervisor.', 'aviso');
+            return;
+        }
+        const acao = acaoPendenteAutorizacao;
+        acaoPendenteAutorizacao = null;
+        overlaySupervisor.style.display = 'none';
+        if (acao) await acao(email, senha);
+    });
+
+    supervisorSenhaInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('btn-confirmar-supervisor').click();
+        }
+    });
+
+    renderizarLista();
+})();
+</script>

@@ -115,6 +115,7 @@
                 {
                     <li class="px-3 pt-2 pb-1 small text-uppercase text-muted fw-bold" style="font-size: 0.7rem; letter-spacing: 0.5px;">Operação</li>
                     <li><a href="/Caixa/Index"><i class="bi bi-cpu-fill"></i> Frente de Caixa / PDV</a></li>
+                    <li><a href="/Caixa/Comandas"><i class="bi bi-receipt"></i> Comandas</a></li>
                     <li><a href="/Caixa/Turno"><i class="bi bi-clock-history"></i> Controle de Turno</a></li>
                 }
 
@@ -124,6 +125,7 @@
                     <li><a href="/Admin/Index"><i class="bi bi-graph-up-arrow"></i> Dashboard Loja</a></li>
                     <li><a href="/Admin/Estoque"><i class="bi bi-box-seam"></i> Estoque / Produtos</a></li>
                     <li><a href="/Admin/Clientes"><i class="bi bi-people"></i> Clientes & Fiado</a></li>
+                    <li><a href="/Admin/Comandas"><i class="bi bi-receipt-cutoff"></i> Comandas</a></li>
                     <li><a href="/Admin/Funcionarios"><i class="bi bi-person-badge"></i> Funcionários</a></li>
                 }
 
@@ -153,6 +155,22 @@
                     </a>
                 </div>
             </div>
+
+            @{
+                var nomeLojaImpersonada = User.FindFirst("ImpersonatedTenantNome")?.Value;
+            }
+            @if (!string.IsNullOrEmpty(nomeLojaImpersonada))
+            {
+                <div class="d-flex justify-content-between align-items-center px-4 py-2"
+                     style="background: rgba(255,193,7,.12); border-bottom: 1px solid rgba(255,193,7,.3);">
+                    <span class="small text-warning fw-semibold">
+                        <i class="bi bi-eye-fill me-2"></i>Modo Loja: @nomeLojaImpersonada
+                    </span>
+                    <form method="post" action="/SuperAdmin/Adegas?handler=Sair">
+                        <button type="submit" class="btn btn-sm btn-outline-warning">Sair do modo loja</button>
+                    </form>
+                </div>
+            }
 
             <div class="main-body">
                 @RenderBody()
