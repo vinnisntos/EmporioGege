@@ -486,6 +486,9 @@
                 comandas.delete(comandaAtivaId);
                 fecharPainel();
                 mostrarToast('Comanda fechada com sucesso!', 'sucesso');
+                if (resultado.reciboImpresso === false) {
+                    mostrarToast('Comanda fechada, mas o recibo não imprimiu — confira a impressora.', 'aviso');
+                }
             } else {
                 mostrarToast(resultado.mensagem ?? 'Não foi possível fechar a comanda.', 'erro');
             }

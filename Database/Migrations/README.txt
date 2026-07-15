@@ -194,6 +194,30 @@ Cadastro de Lojas / Gestão de Contexto (Pages/SuperAdmin/Adegas)
     gravar essa claim (o handler que assina o cookie é gated por ela);
     administrador/vendedor não tem como forjar acesso a outro tenant.
 
+Recibo impresso (impressora térmica Bluetooth, ESC/POS)
+  - Impressão automática ao finalizar venda de balcão (Caixa/Index) ou
+    fechar comanda (Caixa/Comandas): nome da loja, itens, total e
+    forma de pagamento. Testado ao vivo numa impressora térmica
+    Bluetooth (Leopardo, identificada pelo Windows como "MPT-III"),
+    pareada como porta serial virtual (Bluetooth SPP) e comandada via
+    System.IO.Ports.SerialPort com comandos ESC/POS crus (ESC @, ESC
+    E, ESC a) - IImpressoraReciboService/SerialPortImpressoraReciboService
+    em Infrastructure/Impressao.
+  - Configuração por máquina física (seção "Impressora" em
+    appsettings.json/user-secrets, igual à connection string) - cada
+    PC de caixa tem sua própria impressora pareada, possivelmente numa
+    porta COM diferente. Vem desligada por padrão (Habilitada: false)
+    no repo.
+  - Preço/quantidade impressos vêm do valor REALMENTE aplicado na
+    transação da venda (ResultadoVendaDto.Itens), não de uma releitura
+    do catálogo depois do fato.
+  - Falha de impressão (impressora desligada, porta errada, sem
+    papel) NUNCA bloqueia a venda - já está tudo gravado no banco
+    antes da tentativa; só loga um warning e devolve
+    `reciboImpresso: false` na resposta, que a tela mostra como aviso.
+  - Sem corte automático de papel (a MPT-III não tem guilhotina) e sem
+    botão de reimpressão manual nesta rodada.
+
 Integração Zé Delivery (webhook)
   - Endpoint público POST /webhooks/zedelivery/{token}, autenticado
     por token de URL + assinatura HMAC-SHA256 do corpo.
@@ -294,7 +318,6 @@ conferência direto no banco) - nenhum aparecia só com "dotnet build".
 - Bloqueio de login por status_licenca/data_expiracao do tenant: os
   campos existem e são editáveis em SuperAdmin/Adegas, mas nada ainda
   impede login de um tenant "suspenso"/"cancelado"/expirado.
-- Emissão/impressão de recibo pro cliente na hora da venda.
 - Testes automatizados (nenhum criado até agora).
 - Proteção contra força bruta no login.
 - Integração de pagamento (maquininha, QR code Pix) - os métodos de

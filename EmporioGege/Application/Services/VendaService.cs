@@ -42,6 +42,9 @@ namespace EmporioGege.Application.Services
                     // nunca do cliente — evita venda finalizar com preço adulterado no request.
                     var totalVenda = dto.Itens.Zip(itensBaixados, (item, r) => r.PrecoUnitarioAplicado * item.Quantidade).Sum();
                     var totalCusto = dto.Itens.Zip(itensBaixados, (item, r) => r.CustoUnitarioAplicado * item.Quantidade).Sum();
+                    var itensResultado = dto.Itens
+                        .Zip(itensBaixados, (item, r) => new ItemVendaResultadoDto(item.ProdutoId, item.Quantidade, r.PrecoUnitarioAplicado, r.PrecoUnitarioAplicado * item.Quantidade))
+                        .ToList();
 
                     // Fiado: trava a linha do cliente (FOR UPDATE) e checa o limite de crédito
                     // na MESMA transação da venda — se estourar, a venda inteira reverte junto
@@ -142,7 +145,7 @@ namespace EmporioGege.Application.Services
                     }
 
                     await transaction.CommitAsync(ct);
-                    return new ResultadoVendaDto(vendaId, totalVenda, totalCusto);
+                    return new ResultadoVendaDto(vendaId, totalVenda, totalCusto, itensResultado);
                 }
                 catch (PostgresException ex) when (ex.SqlState == "40001" && tentativa < MaxTentativas)
                 {

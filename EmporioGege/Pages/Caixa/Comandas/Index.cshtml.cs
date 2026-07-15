@@ -15,7 +15,10 @@ namespace EmporioGege.Pages.Caixa.Comandas
         ICatalogoService catalogoService,
         IClienteService clienteService,
         ITurnoService turnoService,
-        ISupervisorAutorizacaoService supervisorAutorizacaoService) : PageModel
+        ISupervisorAutorizacaoService supervisorAutorizacaoService,
+        ITenantProvider tenantProvider,
+        ITenantService tenantService,
+        IImpressoraReciboService impressoraReciboService) : PageModel
     {
         public List<ProdutoCatalogoDto> Produtos { get; set; } = [];
 
@@ -195,17 +198,25 @@ namespace EmporioGege.Pages.Caixa.Comandas
                 { StatusCode = StatusCodes.Status409Conflict };
             }
 
+            // Snapshot dos itens ANTES de fechar (nomes de produto pro recibo) - depois do
+            // fechamento a comanda muda de status e ObterDetalheAsync ainda funcionaria, mas
+            // é mais simples já ter isso em mãos assim que o fechamento confirmar sucesso.
+            var detalheAntesDoFechamento = await comandaService.ObterDetalheAsync(comandaId, ct);
+
             try
             {
                 var resultado = await comandaService.FecharAsync(
                     comandaId, turnoAberto.Id, request.MetodoPagamento, request.EmitirNotaFiscal, clienteId, ct);
+
+                var reciboImpresso = await TentarImprimirReciboAsync(resultado, request.MetodoPagamento, detalheAntesDoFechamento, ct);
 
                 return new JsonResult(new
                 {
                     sucesso = true,
                     mensagem = "Comanda fechada com sucesso.",
                     vendaId = resultado.VendaId,
-                    totalVenda = resultado.TotalVenda
+                    totalVenda = resultado.TotalVenda,
+                    reciboImpresso
                 });
             }
             catch (ComandaInvalidaException ex)
@@ -227,6 +238,28 @@ namespace EmporioGege.Pages.Caixa.Comandas
                 return new JsonResult(new { sucesso = false, mensagem = ex.Message, clienteId = ex.ClienteId })
                 { StatusCode = StatusCodes.Status409Conflict };
             }
+        }
+
+        // Impressão nunca bloqueia o fechamento: já está tudo gravado no banco antes daqui.
+        // Preço/quantidade vêm de resultado.Itens (o que foi REALMENTE aplicado na transação
+        // da venda); o nome do produto vem do snapshot da comanda tirado antes de fechar.
+        private async Task<bool> TentarImprimirReciboAsync(
+            ResultadoVendaDto resultado, string metodoPagamento, ComandaDetalheDto? detalheAntesDoFechamento, CancellationToken ct)
+        {
+            var nomesPorId = detalheAntesDoFechamento?.Itens.ToDictionary(i => i.ProdutoId, i => i.ProdutoNome)
+                ?? new Dictionary<Guid, string>();
+
+            var itensRecibo = resultado.Itens
+                .Select(i => new ItemReciboDto(nomesPorId.GetValueOrDefault(i.ProdutoId, "Produto"), i.Quantidade, i.PrecoUnitarioAplicado, i.Subtotal))
+                .ToList();
+
+            var loja = await tenantService.ObterAsync(tenantProvider.RequireTenantId(), ct);
+
+            var recibo = new ReciboVendaDto(
+                loja?.NomeFantasia ?? "Empório Gege", resultado.VendaId, DateTime.UtcNow, itensRecibo,
+                resultado.TotalVenda, metodoPagamento, detalheAntesDoFechamento?.NumeroComanda);
+
+            return await impressoraReciboService.ImprimirAsync(recibo, ct);
         }
 
         private async Task<bool> AutorizadoAsync(string? supervisorEmail, string? supervisorSenha, CancellationToken ct)

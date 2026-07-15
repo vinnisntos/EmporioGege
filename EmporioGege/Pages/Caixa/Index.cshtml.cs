@@ -10,7 +10,10 @@ using EmporioGege.Core.Interfaces;
 namespace EmporioGege.Pages.Caixa
 {
     [Authorize(Policy = "CaixaOnly")]
-    public class IndexModel(ICatalogoService catalogoService, IClienteService clienteService, IVendaService vendaService, ITurnoService turnoService, ITenantProvider tenantProvider) : PageModel
+    public class IndexModel(
+        ICatalogoService catalogoService, IClienteService clienteService, IVendaService vendaService,
+        ITurnoService turnoService, ITenantProvider tenantProvider, ITenantService tenantService,
+        IImpressoraReciboService impressoraReciboService) : PageModel
     {
         public List<ProdutoCatalogoDto> Produtos { get; set; } = [];
 
@@ -91,6 +94,8 @@ namespace EmporioGege.Pages.Caixa
                 var resultado = await vendaService.FinalizarVendaAsync(
                     new FinalizarVendaDto(turnoAberto.Id, itens, TipoOrigemVenda.Balcao, request.EmitirNotaFiscal, request.MetodoPagamento, clienteId), ct);
 
+                var reciboImpresso = await TentarImprimirReciboAsync(resultado, request.MetodoPagamento, ct);
+
                 return new JsonResult(new
                 {
                     sucesso = true,
@@ -98,7 +103,8 @@ namespace EmporioGege.Pages.Caixa
                     vendaId = resultado.VendaId,
                     totalVenda = resultado.TotalVenda,
                     emitirNotaFiscal = request.EmitirNotaFiscal,
-                    metodoPagamento = request.MetodoPagamento
+                    metodoPagamento = request.MetodoPagamento,
+                    reciboImpresso
                 });
             }
             catch (EstoqueInsuficienteException ex)
@@ -119,6 +125,27 @@ namespace EmporioGege.Pages.Caixa
                 return new JsonResult(new { sucesso = false, mensagem = ex.Message, clienteId = ex.ClienteId })
                 { StatusCode = StatusCodes.Status409Conflict };
             }
+        }
+
+        // Impressão nunca bloqueia a venda: já está tudo gravado no banco antes daqui.
+        // Nome do produto vem de uma releitura do catálogo (resultado.Itens só tem o
+        // ProdutoId + preço já aplicado de verdade na transação, que é o que importa).
+        private async Task<bool> TentarImprimirReciboAsync(ResultadoVendaDto resultado, string metodoPagamento, CancellationToken ct)
+        {
+            var catalogo = await catalogoService.ListarProdutosAsync(ct);
+            var nomesPorId = catalogo.ToDictionary(p => p.Id, p => p.Nome);
+
+            var itensRecibo = resultado.Itens
+                .Select(i => new ItemReciboDto(
+                    nomesPorId.GetValueOrDefault(i.ProdutoId, "Produto"), i.Quantidade, i.PrecoUnitarioAplicado, i.Subtotal))
+                .ToList();
+
+            var loja = await tenantService.ObterAsync(tenantProvider.RequireTenantId(), ct);
+
+            var recibo = new ReciboVendaDto(
+                loja?.NomeFantasia ?? "Empório Gege", resultado.VendaId, DateTime.UtcNow, itensRecibo, resultado.TotalVenda, metodoPagamento);
+
+            return await impressoraReciboService.ImprimirAsync(recibo, ct);
         }
 
         public record ItemVendaRequest(string ProdutoId, int Quantidade, string? TipoPreco = null);

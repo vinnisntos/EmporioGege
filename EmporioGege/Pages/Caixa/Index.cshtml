@@ -422,6 +422,9 @@
 
             if (resposta.ok && resultado.sucesso) {
                 mostrarToast('Venda finalizada com sucesso!', 'sucesso');
+                if (resultado.reciboImpresso === false) {
+                    mostrarToast('Venda registrada, mas o recibo não imprimiu — confira a impressora.', 'aviso');
+                }
                 carrinho.clear();
                 renderizarCarrinho();
                 buscaInput.focus();

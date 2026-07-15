@@ -9,6 +9,7 @@ using EmporioGege.Core.Enums;
 using EmporioGege.Core.Interfaces;
 using EmporioGege.Infrastructure.Auth;
 using EmporioGege.Infrastructure.Data;
+using EmporioGege.Infrastructure.Impressao;
 using EmporioGege.Infrastructure.Tenancy;
 using EmporioGege.Infrastructure.Webhooks;
 
@@ -40,6 +41,12 @@ builder.Services.AddScoped<IClienteService, ClienteService>();
 builder.Services.AddScoped<IComandaService, ComandaService>();
 builder.Services.AddScoped<ISupervisorAutorizacaoService, SupervisorAutorizacaoService>();
 builder.Services.AddScoped<ITenantService, TenantService>();
+
+// Recibo impresso: impressora térmica ligada por porta serial (COM), configurada por
+// máquina física (ver seção "Impressora" em appsettings.json / user-secrets locais) - cada
+// PC de caixa tem a sua própria impressora pareada, muitas vezes numa porta diferente.
+builder.Services.Configure<ImpressoraOptions>(builder.Configuration.GetSection("Impressora"));
+builder.Services.AddScoped<IImpressoraReciboService, SerialPortImpressoraReciboService>();
 
 // 1.2 Permite validar o antiforgery token via header em chamadas AJAX/fetch (PDV),
 // já que essas requisições não enviam o campo de formulário __RequestVerificationToken.
