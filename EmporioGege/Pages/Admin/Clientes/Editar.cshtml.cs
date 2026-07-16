@@ -21,6 +21,10 @@ namespace EmporioGege.Pages.Admin.Clientes
         public string? Telefone { get; set; }
 
         [BindProperty]
+        [Required(ErrorMessage = "Informe o CPF ou RG do cliente.")]
+        public string CpfRg { get; set; } = default!;
+
+        [BindProperty]
         [Range(0, double.MaxValue, ErrorMessage = "Limite de crédito não pode ser negativo.")]
         public decimal LimiteCredito { get; set; }
 
@@ -43,6 +47,7 @@ namespace EmporioGege.Pages.Admin.Clientes
 
             Nome = cliente.Nome;
             Telefone = cliente.Telefone;
+            CpfRg = cliente.CpfRg ?? "";
             LimiteCredito = cliente.LimiteCredito;
             SaldoDevedorAtual = cliente.SaldoDevedor;
 
@@ -54,7 +59,7 @@ namespace EmporioGege.Pages.Admin.Clientes
             if (!ModelState.IsValid)
                 return Page();
 
-            await clienteService.SalvarAsync(new SalvarClienteDto(Id, Nome, Telefone, LimiteCredito), ct);
+            await clienteService.SalvarAsync(new SalvarClienteDto(Id, Nome, Telefone, CpfRg, LimiteCredito), ct);
 
             return RedirectToPage("Index");
         }

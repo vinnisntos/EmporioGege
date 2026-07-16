@@ -1,4 +1,4 @@
 namespace EmporioGege.Application.DTOs
 {
-    public record ClienteDto(Guid Id, string Nome, string? Telefone, decimal LimiteCredito, decimal SaldoDevedor);
+    public record ClienteDto(Guid Id, string Nome, string? Telefone, string? CpfRg, decimal LimiteCredito, decimal SaldoDevedor);
 }

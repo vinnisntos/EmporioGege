@@ -7,7 +7,7 @@ namespace EmporioGege.Application.Services
     public class ClienteService(IDbConnectionFactory connectionFactory, ITenantProvider tenantProvider) : IClienteService
     {
         private const string Selecao = """
-            SELECT id AS Id, nome AS Nome, telefone AS Telefone, limite_credito AS LimiteCredito, saldo_devedor AS SaldoDevedor
+            SELECT id AS Id, nome AS Nome, telefone AS Telefone, cpf_rg AS CpfRg, limite_credito AS LimiteCredito, saldo_devedor AS SaldoDevedor
             FROM clientes
             """;
 
@@ -44,16 +44,16 @@ namespace EmporioGege.Application.Services
             {
                 await connection.ExecuteAsync(new CommandDefinition(
                     """
-                    INSERT INTO clientes (id, tenant_id, nome, telefone, limite_credito, saldo_devedor, created_at)
-                    VALUES (@Id, @TenantId, @Nome, @Telefone, @LimiteCredito, 0, now())
+                    INSERT INTO clientes (id, tenant_id, nome, telefone, cpf_rg, limite_credito, saldo_devedor, created_at)
+                    VALUES (@Id, @TenantId, @Nome, @Telefone, @CpfRg, @LimiteCredito, 0, now())
                     """,
-                    new { Id = clienteId, TenantId = tenantId, dto.Nome, dto.Telefone, dto.LimiteCredito }, cancellationToken: ct));
+                    new { Id = clienteId, TenantId = tenantId, dto.Nome, dto.Telefone, dto.CpfRg, dto.LimiteCredito }, cancellationToken: ct));
             }
             else
             {
                 var linhasAfetadas = await connection.ExecuteAsync(new CommandDefinition(
-                    "UPDATE clientes SET nome = @Nome, telefone = @Telefone, limite_credito = @LimiteCredito WHERE id = @Id AND tenant_id = @TenantId",
-                    new { Id = clienteId, TenantId = tenantId, dto.Nome, dto.Telefone, dto.LimiteCredito }, cancellationToken: ct));
+                    "UPDATE clientes SET nome = @Nome, telefone = @Telefone, cpf_rg = @CpfRg, limite_credito = @LimiteCredito WHERE id = @Id AND tenant_id = @TenantId",
+                    new { Id = clienteId, TenantId = tenantId, dto.Nome, dto.Telefone, dto.CpfRg, dto.LimiteCredito }, cancellationToken: ct));
 
                 if (linhasAfetadas == 0)
                     throw new InvalidOperationException($"Cliente {clienteId} não encontrado para o tenant {tenantId}.");

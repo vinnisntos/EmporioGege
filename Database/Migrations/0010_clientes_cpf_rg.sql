@@ -1,0 +1,11 @@
+-- =============================================================================
+-- Migration 0010: documento (CPF/RG) do cliente no cadastro de fiado.
+--
+-- Coluna nullable de propósito: clientes já cadastrados antes desta migration
+-- não têm documento, e apagar/bloquear esses registros quebraria o histórico
+-- de vendas fiado. A obrigatoriedade de preencher é validada só na tela
+-- (Admin/Clientes/Editar) pra cadastro novo e edição, não no banco.
+--
+-- Idempotente. Rodar manualmente no SQL Editor do Supabase.
+-- =============================================================================
+ALTER TABLE clientes ADD COLUMN IF NOT EXISTS cpf_rg text;

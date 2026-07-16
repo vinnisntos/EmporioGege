@@ -108,6 +108,11 @@ como no processador de webhook).
     Database/Migrations/CREDENCIAIS_TESTE.local.txt - arquivo local,
     no .gitignore, NUNCA commitado. Peça a quem já rodou os testes.
 
+0010_clientes_cpf_rg.sql
+  - clientes.cpf_rg: coluna nullable (não quebra clientes já
+    cadastrados). Obrigatoriedade de preencher é validada só na tela
+    (Admin/Clientes/Editar), não no banco.
+
 
 3. FUNCIONALIDADES ENTREGUES
 ================================================================
@@ -153,6 +158,11 @@ Cadastro de Funcionário (Pages/Admin/Funcionarios)
 
 Cliente / Fiado (Pages/Admin/Clientes)
   - CRUD de cliente com limite de crédito.
+  - Documento (CPF/RG): campo único de texto livre (mesmo padrão do
+    CpfRgDono em SuperAdmin/Adegas), obrigatório no cadastro/edição via
+    validação da tela - coluna do banco é nullable de propósito, pra
+    não quebrar cliente já cadastrado antes desta migration (0010).
+    Aparece na listagem (Admin/Clientes) ao lado do telefone.
   - Registrar pagamento (abate o saldo devedor).
   - Limite de crédito é checado atomicamente na mesma transação da
     venda fiado - nunca deixa o cliente passar do limite.
@@ -386,8 +396,18 @@ NFC-e real, testes automatizados, proteção contra força bruta no
 login, integração de pagamento real, reimpressão manual de recibo,
 tela de configuração da porta da impressora.
 
-Depois desta atualização (bloqueio de login por licença, ver seção 3):
-mudança em Pages/Auth/Login.cshtml.cs, sem migration nova (usa
-status_licenca/data_expiracao que já existiam). Não commitado ainda -
-verificar `git status` na raiz do repo (Database/Migrations/README.txt
-e EmporioGege/Pages/Auth/Login.cshtml.cs) antes de continuar.
+Bloqueio de login por licença (commit fa29192) já commitado.
+
+Documento (CPF/RG) do cliente (ver seção 3, migration 0010): migration
+0010 já rodada no Supabase (ADD COLUMN cpf_rg, nullable). Verificado
+com round-trip direto no banco (insert/select/update/delete via SQL
+cru batendo com a query que o ClienteService usa) - NÃO testado ainda
+clicando na tela Admin/Clientes de verdade, porque não há credencial
+de administrador para o tenant de teste (só vendedor caixa01, que não
+acessa Admin/*) nem sessão de superadmin disponível na sessão que fez
+essa mudança. Vale abrir Admin/Clientes/Editar como
+administrador/superadmin e conferir o campo CPF/RG antes de considerar
+isso 100% validado. Não commitado ainda - verificar `git status`
+(Database/Migrations/0010_clientes_cpf_rg.sql + Application/DTOs/
+ClienteDto.cs, SalvarClienteDto.cs + Application/Services/
+ClienteService.cs + Pages/Admin/Clientes/*).
