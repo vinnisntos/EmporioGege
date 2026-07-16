@@ -1,0 +1,200 @@
+@page
+@model EmporioGege.Pages.Admin.Vendas.IndexModel
+@{
+    ViewData["Title"] = "Extrato de Vendas";
+}
+
+<style>
+    .badge-origem-balcao { background: rgba(13, 110, 253, .15); color: #6ea8fe; border: 1px solid rgba(13, 110, 253, .4); }
+    .badge-origem-comanda { background: rgba(255, 193, 7, .15); color: #ffc107; border: 1px solid rgba(255, 193, 7, .4); }
+    .badge-origem-zedelivery { background: rgba(25, 135, 84, .15); color: #52d489; border: 1px solid rgba(25, 135, 84, .4); }
+    .linha-itens-venda td { background: rgba(255, 255, 255, .02); }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-0 text-white fw-bold">Extrato de Vendas</h1>
+        <p class="text-muted small mb-0">Histórico de vendas fechadas, com reimpressão manual de recibo.</p>
+    </div>
+</div>
+
+<form method="get" class="card card-custom p-3 mb-3">
+    <div class="row g-3 align-items-end">
+        <div class="col-auto">
+            <label asp-for="De" class="form-label small text-muted">De</label>
+            <input asp-for="De" type="date" class="form-control" />
+        </div>
+        <div class="col-auto">
+            <label asp-for="Ate" class="form-label small text-muted">Até</label>
+            <input asp-for="Ate" type="date" class="form-control" />
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-warning fw-semibold">Filtrar</button>
+        </div>
+        <div class="col-auto ms-auto text-end">
+            <div class="text-muted small">Total no período</div>
+            <div class="fs-5 text-white fw-semibold">@Model.TotalPeriodo.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))</div>
+        </div>
+    </div>
+</form>
+
+<div id="toast-container"></div>
+
+<div class="card card-custom p-3">
+    @if (Model.Vendas.Count == 0)
+    {
+        <p class="text-muted text-center py-4 mb-0">Nenhuma venda encontrada no período selecionado.</p>
+    }
+    else
+    {
+        <table class="table table-dark table-borderless align-middle mb-0">
+            <thead>
+                <tr class="text-muted small text-uppercase">
+                    <th>Data/Hora</th>
+                    <th>Origem</th>
+                    <th>Cliente</th>
+                    <th>Pagamento</th>
+                    <th class="text-end">Total</th>
+                    <th style="width:260px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var v in Model.Vendas)
+                {
+                    var badgeClasse = v.TipoOrigem switch
+                    {
+                        "COMANDA" => "badge-origem-comanda",
+                        "ZEDELIVERY" => "badge-origem-zedelivery",
+                        _ => "badge-origem-balcao"
+                    };
+                    var origemTexto = v.TipoOrigem switch
+                    {
+                        "COMANDA" => $"Comanda {v.NumeroComanda}",
+                        "ZEDELIVERY" => "Zé Delivery",
+                        _ => "Balcão"
+                    };
+                    <tr data-venda-id="@v.Id">
+                        <td class="text-white small">@v.DataVenda.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                        <td><span class="badge @badgeClasse">@origemTexto</span></td>
+                        <td class="text-muted">@(v.ClienteNome ?? "—")</td>
+                        <td class="text-muted">@(v.MetodoPagamento ?? "—")</td>
+                        <td class="text-end text-white fw-medium">@v.TotalVenda.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))</td>
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end align-items-center gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-light btn-ver-itens">
+                                    <i class="bi bi-list-ul me-1"></i>Ver itens
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-warning btn-reimprimir">
+                                    <i class="bi bi-printer me-1"></i>Reimprimir
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr class="linha-itens-venda" style="display:none;">
+                        <td colspan="6">
+                            <div class="itens-venda-conteudo text-muted small py-2">Carregando...</div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@Html.AntiForgeryToken()
+
+<script>
+(function () {
+    const antiforgeryToken = document.querySelector('input[name="__RequestVerificationToken"]').value;
+
+    function formatarMoeda(valor) {
+        return (valor ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    // Nome de produto é texto livre — sem isso, um cadastro malicioso executaria via
+    // innerHTML aqui igual ao PDV (Caixa/Index.cshtml).
+    function escapeHtml(texto) {
+        const div = document.createElement('div');
+        div.textContent = texto ?? '';
+        return div.innerHTML;
+    }
+
+    function mostrarToast(mensagem, tipo) {
+        const cor = tipo === 'erro' ? 'bg-danger' : tipo === 'aviso' ? 'bg-warning text-dark' : 'bg-success';
+        const toast = document.createElement('div');
+        toast.className = `toast align-items-center text-white ${cor} border-0 mb-2 show`;
+        toast.innerHTML = `<div class="d-flex"><div class="toast-body">${escapeHtml(mensagem)}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" aria-label="Fechar"></button></div>`;
+        toast.querySelector('.btn-close').addEventListener('click', () => toast.remove());
+        document.getElementById('toast-container').appendChild(toast);
+        setTimeout(() => toast.remove(), 5000);
+    }
+
+    async function postJson(url) {
+        const resposta = await fetch(url, {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': antiforgeryToken }
+        });
+        const resultado = await resposta.json().catch(() => ({}));
+        return { ok: resposta.ok, resultado };
+    }
+
+    document.querySelectorAll('.btn-ver-itens').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const linhaPrincipal = btn.closest('tr');
+            const linhaItens = linhaPrincipal.nextElementSibling;
+            const conteudo = linhaItens.querySelector('.itens-venda-conteudo');
+            const vendaId = linhaPrincipal.dataset.vendaId;
+
+            const aberta = linhaItens.style.display !== 'none';
+            if (aberta) {
+                linhaItens.style.display = 'none';
+                return;
+            }
+
+            linhaItens.style.display = 'table-row';
+            conteudo.textContent = 'Carregando...';
+
+            try {
+                const resposta = await fetch(`/Admin/Vendas?handler=Detalhe&id=${vendaId}`);
+                const dados = await resposta.json();
+                if (!resposta.ok || !dados.sucesso || dados.venda.itens.length === 0) {
+                    conteudo.textContent = 'Nenhum item encontrado nesta venda.';
+                    return;
+                }
+
+                conteudo.innerHTML = dados.venda.itens.map(i => `
+                    <div class="d-flex justify-content-between py-1 border-bottom border-secondary border-opacity-25">
+                        <span>${escapeHtml(i.produtoNome)} <span class="text-muted">x${i.quantidade}</span></span>
+                        <span>${formatarMoeda(i.subtotal)}</span>
+                    </div>
+                `).join('');
+            } catch {
+                conteudo.textContent = 'Falha ao carregar os itens.';
+            }
+        });
+    });
+
+    document.querySelectorAll('.btn-reimprimir').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const vendaId = btn.closest('tr').dataset.vendaId;
+            btn.disabled = true;
+
+            try {
+                const { ok, resultado } = await postJson(`/Admin/Vendas?handler=Reimprimir&id=${vendaId}`);
+                if (!ok || !resultado.sucesso) {
+                    mostrarToast(resultado.mensagem ?? 'Falha ao reimprimir o recibo.', 'erro');
+                } else if (!resultado.reciboImpresso) {
+                    mostrarToast('Venda encontrada, mas a impressora não respondeu (verifique a porta/conexão).', 'aviso');
+                } else {
+                    mostrarToast('Recibo reimpresso com sucesso.', 'sucesso');
+                }
+            } catch {
+                mostrarToast('Falha ao reimprimir o recibo.', 'erro');
+            } finally {
+                btn.disabled = false;
+            }
+        });
+    });
+})();
+</script>

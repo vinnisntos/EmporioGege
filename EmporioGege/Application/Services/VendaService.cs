@@ -156,6 +156,54 @@ namespace EmporioGege.Application.Services
             throw new InvalidOperationException($"Falha ao finalizar venda após {MaxTentativas} tentativas (conflitos de concorrência).");
         }
 
+        private const string SelecaoResumo = """
+            SELECT v.id AS Id, v.data_venda AS DataVenda, v.tipo_origem AS TipoOrigem, v.metodo_pagamento AS MetodoPagamento,
+                   com.numero_comanda AS NumeroComanda, cli.nome AS ClienteNome, v.total_venda AS TotalVenda, v.total_custo AS TotalCusto
+            FROM vendas v
+            LEFT JOIN comandas com ON com.id = v.comanda_id
+            LEFT JOIN clientes cli ON cli.id = v.cliente_id
+            WHERE v.tenant_id = @TenantId AND v.status = 'FECHADA'
+            """;
+
+        public async Task<IReadOnlyList<VendaResumoDto>> ListarAsync(DateTime inicio, DateTime fimExclusivo, CancellationToken ct = default)
+        {
+            var tenantId = tenantProvider.RequireTenantId();
+
+            await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+            var linhas = await connection.QueryAsync<VendaResumoDto>(new CommandDefinition(
+                $"{SelecaoResumo} AND v.data_venda >= @Inicio AND v.data_venda < @Fim ORDER BY v.data_venda DESC",
+                new { TenantId = tenantId, Inicio = inicio, Fim = fimExclusivo }, cancellationToken: ct));
+
+            return linhas.AsList();
+        }
+
+        public async Task<VendaDetalheDto?> ObterDetalheAsync(Guid id, CancellationToken ct = default)
+        {
+            var tenantId = tenantProvider.RequireTenantId();
+
+            await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+
+            var venda = await connection.QuerySingleOrDefaultAsync<VendaResumoDto>(new CommandDefinition(
+                $"{SelecaoResumo} AND v.id = @Id",
+                new { TenantId = tenantId, Id = id }, cancellationToken: ct));
+
+            if (venda is null)
+                return null;
+
+            var itens = await connection.QueryAsync<ItemVendaDetalheDto>(new CommandDefinition(
+                """
+                SELECT p.nome AS ProdutoNome, vi.quantidade AS Quantidade, vi.preco_unitario_aplicado AS PrecoUnitarioAplicado, vi.subtotal AS Subtotal
+                FROM vendas_itens vi
+                JOIN produtos p ON p.id = vi.produto_id
+                WHERE vi.tenant_id = @TenantId AND vi.venda_id = @VendaId
+                """,
+                new { TenantId = tenantId, VendaId = id }, cancellationToken: ct));
+
+            return new VendaDetalheDto(
+                venda.Id, venda.DataVenda, venda.TipoOrigem, venda.MetodoPagamento, venda.NumeroComanda,
+                venda.ClienteNome, venda.TotalVenda, venda.TotalCusto, itens.AsList());
+        }
+
         private sealed record ClienteCreditoRow(decimal LimiteCredito, decimal SaldoDevedor);
     }
 }

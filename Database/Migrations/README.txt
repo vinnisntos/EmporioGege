@@ -239,8 +239,32 @@ Recibo impresso (impressora térmica Bluetooth, ESC/POS)
     papel) NUNCA bloqueia a venda - já está tudo gravado no banco
     antes da tentativa; só loga um warning e devolve
     `reciboImpresso: false` na resposta, que a tela mostra como aviso.
-  - Sem corte automático de papel (a MPT-III não tem guilhotina) e sem
-    botão de reimpressão manual nesta rodada.
+  - Sem corte automático de papel (a MPT-III não tem guilhotina).
+
+Extrato de Vendas / Reimpressão manual de recibo (Pages/Admin/Vendas)
+  - Lista as vendas FECHADAS do tenant num período (filtro De/Até, ISO
+    "hoje-6 dias" até "hoje" por padrão), com origem (Balcão/Comanda/
+    Zé Delivery), cliente (fiado), forma de pagamento e total - mesma
+    convenção de intervalo [inicio, fimExclusivo) do DashboardService.
+  - "Ver itens" (igual ao Admin/Comandas) mostra os itens de uma venda
+    sob demanda via handler JSON, sem recarregar a página.
+  - "Reimprimir" busca a venda já persistida no banco (IVendaService.
+    ObterDetalheAsync - novo método, com item por item via join em
+    produtos) e manda pra mesma impressora térmica configurada
+    (IImpressoraReciboService), reconstruindo o ReciboVendaDto a partir
+    dos dados gravados (não da transação em memória, diferente da
+    impressão automática no fechamento). Segue a mesma regra de nunca
+    bloquear: se a impressora falhar, só avisa na tela (reciboImpresso:
+    false), a venda já estava e continua gravada.
+  - Verificado rodando as duas queries novas (listagem e detalhe) direto
+    no banco contra vendas de teste reais do tenant do caixa01 (balcão e
+    comanda, com join de numero_comanda funcionando) - NÃO clicado na
+    tela de verdade nem testado o botão Reimprimir contra a impressora
+    física, porque não há credencial de administrador para esse tenant
+    de teste (só vendedor caixa01) nem sessão de navegador disponível.
+    Vale abrir Admin/Vendas como administrador/superadmin e clicar em
+    "Reimprimir" numa venda de teste antes de considerar isso validado
+    de ponta a ponta.
 
 Integração Zé Delivery (webhook)
   - Endpoint público POST /webhooks/zedelivery/{token}, autenticado
@@ -343,9 +367,6 @@ conferência direto no banco) - nenhum aparecia só com "dotnet build".
 - Proteção contra força bruta no login.
 - Integração de pagamento (maquininha, QR code Pix) - os métodos de
   pagamento no PDV são só rótulos hoje.
-- Reimpressão manual de recibo (hoje só imprime automático na hora da
-  venda/fechamento de comanda; sem botão de reimprimir um recibo
-  antigo a partir do histórico).
 - Tela de configuração da porta da impressora dentro do sistema (hoje
   é só appsettings.json/user-secrets, sem UI).
 
@@ -393,21 +414,25 @@ reversível com `UPDATE profiles SET tenant_id = NULL WHERE role =
 
 Backlog restante pra continuar (ver seção 5, sem ordem definida ainda):
 NFC-e real, testes automatizados, proteção contra força bruta no
-login, integração de pagamento real, reimpressão manual de recibo,
-tela de configuração da porta da impressora.
+login, integração de pagamento real, tela de configuração da porta da
+impressora.
 
-Bloqueio de login por licença (commit fa29192) já commitado.
+Bloqueio de login por licença (commit fa29192) e documento CPF/RG do
+cliente (commit 71f92a8, migration 0010) já commitados e com push
+feito pro origin/main.
 
-Documento (CPF/RG) do cliente (ver seção 3, migration 0010): migration
-0010 já rodada no Supabase (ADD COLUMN cpf_rg, nullable). Verificado
-com round-trip direto no banco (insert/select/update/delete via SQL
-cru batendo com a query que o ClienteService usa) - NÃO testado ainda
-clicando na tela Admin/Clientes de verdade, porque não há credencial
-de administrador para o tenant de teste (só vendedor caixa01, que não
-acessa Admin/*) nem sessão de superadmin disponível na sessão que fez
-essa mudança. Vale abrir Admin/Clientes/Editar como
-administrador/superadmin e conferir o campo CPF/RG antes de considerar
-isso 100% validado. Não commitado ainda - verificar `git status`
-(Database/Migrations/0010_clientes_cpf_rg.sql + Application/DTOs/
-ClienteDto.cs, SalvarClienteDto.cs + Application/Services/
-ClienteService.cs + Pages/Admin/Clientes/*).
+Extrato de Vendas + Reimpressão manual de recibo (ver seção 3,
+Pages/Admin/Vendas): sem migration nova (só usa tabelas vendas/
+vendas_itens/comandas/clientes que já existiam). Verificado rodando as
+queries novas direto no banco contra vendas de teste reais - NÃO
+clicado na tela de verdade nem testado o botão "Reimprimir" contra a
+impressora física, pelo mesmo motivo de sempre (só há credencial de
+vendedor caixa01 pro tenant de teste, sem administrador/superadmin
+disponível na sessão que fez essa mudança). Vale abrir Admin/Vendas
+como administrador/superadmin, conferir o extrato e testar o botão
+"Reimprimir" numa venda de teste (com a impressora ligada em COM4)
+antes de considerar isso validado de ponta a ponta. Não commitado
+ainda - verificar `git status` (Application/DTOs/VendaResumoDto.cs,
+VendaDetalheDto.cs + Application/Services/VendaService.cs +
+Core/Interfaces/IVendaService.cs + Pages/Admin/Vendas/* +
+Pages/Shared/_Layout.cshtml).
