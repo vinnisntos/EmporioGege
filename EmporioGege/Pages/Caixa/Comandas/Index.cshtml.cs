@@ -39,7 +39,7 @@ namespace EmporioGege.Pages.Caixa.Comandas
 
         public async Task OnGetAsync(CancellationToken ct)
         {
-            if (User.FindFirst("TenantId")?.Value is not { Length: > 0 })
+            if (tenantProvider.TenantId is null)
             {
                 SemTenant = true;
                 return;

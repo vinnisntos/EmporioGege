@@ -1,0 +1,108 @@
+PENDÊNCIAS PARA VENDER O EMPÓRIO GEGÊ COMO PRODUTO
+================================================================
+Levantamento feito em 2026-07-16 após testar o sistema de ponta a
+ponta (cadastro de loja, PDV, turno, comandas, estoque, clientes,
+funcionários, vendas). Lista do que falta antes de oferecer o
+sistema para clientes reais.
+
+
+1. INFRAESTRUTURA DE E-MAIL (SMTP PRÓPRIO) — BLOQUEADOR
+================================================================
+O projeto usa o serviço de e-mail padrão/compartilhado do Supabase
+Auth, que tem um limite baixo de envios por hora. Qualquer conta nova
+(funcionário criado em Admin/Funcionarios, ou qualquer outro fluxo que
+use SignUp) dispara um e-mail de confirmação por esse serviço.
+
+Isso já bateu no limite durante os testes (erro "over_email_send_rate_
+limit" ao tentar cadastrar um funcionário). Em produção, com lojas
+reais cadastrando funcionários com alguma frequência, o sistema vai
+travar o cadastro depois de poucas contas.
+
+O que fazer: configurar um provedor SMTP próprio no painel do Supabase
+(SendGrid, Postmark, Amazon SES ou similar) antes de colocar o sistema
+em produção para clientes reais.
+
+
+2. ONBOARDING SELF-SERVICE E COBRANÇA
+================================================================
+Hoje o cadastro de uma loja nova só pode ser feito manualmente pelo
+superadmin (SuperAdmin/Adegas), que também precisa criar o primeiro
+administrador da loja "entrando" nela. Não existe:
+  - Fluxo de autocadastro (o dono de uma adega se cadastrar sozinho,
+    sem depender de alguém com acesso de superadmin).
+  - Escolha de plano.
+  - Cobrança/assinatura automatizada — o campo status_licenca e a
+    data de expiração são editados manualmente pelo superadmin, sem
+    nenhuma integração com um meio de pagamento (Stripe ou similar)
+    por trás.
+
+Se a venda for feita via contato comercial direto (você cadastrando
+cada cliente manualmente), isso não bloqueia o lançamento. Se a ideia
+for venda self-service (o cliente se cadastra e paga sozinho), esse
+fluxo completo ainda precisa ser construído.
+
+
+3. NFC-E REAL (EMISSÃO FISCAL)
+================================================================
+Hoje existe só um campo interno "emitir_nota_fiscal" (uma marcação),
+sem emissão de nota fiscal de verdade. Falta escolher um provedor
+(Focus NFe, eNotas, PlugNotas são os candidatos considerados) e
+integrar a emissão real. Sem isso, o sistema não substitui uma
+solução com nota fiscal eletrônica de verdade — importante dependendo
+do porte/regime tributário do cliente.
+
+
+4. INTEGRAÇÃO DE PAGAMENTO NO PDV
+================================================================
+Débito, crédito e Pix aparecem como opções no PDV, mas são só
+rótulos — não há processamento real (nem integração com maquininha,
+nem geração de QR code Pix). O caixa registra a venda como se o
+pagamento tivesse sido feito, mas não confirma o recebimento de
+verdade.
+
+
+5. PROTEÇÃO CONTRA FORÇA BRUTA NO LOGIN
+================================================================
+Não existe limite de tentativas de login. Um ataque de força bruta
+contra qualquer conta (inclusive superadmin) pode ser tentado sem
+bloqueio. Recomendado antes de expor o sistema publicamente na
+internet para clientes reais.
+
+
+6. TESTES AUTOMATIZADOS
+================================================================
+Nenhum teste automatizado existe hoje. Todo o sistema foi validado
+manualmente (clicando nas telas ou testando direto contra o banco).
+Isso aumenta o risco de regressão conforme o sistema cresce — vale
+pelo menos cobrir os fluxos críticos (venda atômica, turno de caixa,
+limite de crédito de fiado) com testes antes de crescer muito mais.
+
+
+7. TELA DE CONFIGURAÇÃO DA IMPRESSORA
+================================================================
+A porta COM da impressora térmica é configurada só por
+appsettings.json/user-secrets, direto no servidor — não existe uma
+tela dentro do sistema para o dono da loja configurar isso sozinho.
+Cada loja nova com impressora precisa de alguém com acesso técnico
+pra configurar a porta manualmente.
+
+
+8. REVISÃO DE SEGURANÇA GERAL
+================================================================
+O sistema já passou por várias correções de segurança ao longo do
+desenvolvimento (RLS, XSS, vazamento de stack trace, escalação de
+privilégio), mas uma revisão de segurança formal antes do lançamento
+comercial (pentest ou auditoria externa) é recomendada, dado que o
+sistema vai lidar com dados financeiros e de clientes de terceiros.
+
+
+RESUMO — ORDEM DE PRIORIDADE SUGERIDA
+================================================================
+1. SMTP próprio (bloqueador imediato, trava cadastro de funcionário)
+2. Proteção contra força bruta (segurança básica antes de expor)
+3. NFC-e real (se o cliente-alvo exigir nota fiscal)
+4. Integração de pagamento real no PDV
+5. Onboarding self-service + cobrança (só se a venda for self-service)
+6. Testes automatizados
+7. Tela de configuração de impressora
+8. Revisão de segurança formal

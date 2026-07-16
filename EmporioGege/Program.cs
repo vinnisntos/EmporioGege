@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Localization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Supabase;
 using EmporioGege.Application.Services;
@@ -101,6 +102,12 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizeFolder("/SuperAdmin", "SuperAdminOnly");
     options.Conventions.AuthorizeFolder("/Admin", "AdminOnly");
     options.Conventions.AuthorizeFolder("/Caixa", "CaixaOnly");
+
+    // Superadmin pode acessar essas pastas sem ter "entrado" numa loja (SuperAdmin/Adegas) -
+    // sem este filtro, qualquer página aqui dentro derrubava com erro 500 genérico ao tentar
+    // resolver o tenant (ver ExigeTenantPageFilter).
+    options.Conventions.AddFolderApplicationModelConvention("/Admin", model => model.Filters.Add(new TypeFilterAttribute(typeof(ExigeTenantPageFilter))));
+    options.Conventions.AddFolderApplicationModelConvention("/Caixa", model => model.Filters.Add(new TypeFilterAttribute(typeof(ExigeTenantPageFilter))));
 });
 
 var app = builder.Build();

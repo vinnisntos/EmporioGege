@@ -168,6 +168,7 @@
                         <i class="bi bi-eye-fill me-2"></i>Modo Loja: @nomeLojaImpersonada
                     </span>
                     <form method="post" action="/SuperAdmin/Adegas?handler=Sair">
+                        @Html.AntiForgeryToken()
                         <button type="submit" class="btn btn-sm btn-outline-warning">Sair do modo loja</button>
                     </form>
                 </div>

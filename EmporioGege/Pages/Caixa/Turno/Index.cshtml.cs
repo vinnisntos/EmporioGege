@@ -54,7 +54,11 @@ namespace EmporioGege.Pages.Caixa.Turno
 
         public async Task<IActionResult> OnPostAbrirAsync(CancellationToken ct)
         {
-            if (!ModelState.IsValid)
+            // Checa só o campo desse handler - o PageModel tem 3 forms/handlers (Abrir,
+            // Lancamento, Fechar) compartilhando [BindProperty]; ModelState.IsValid geral
+            // reprovaria aqui por causa de campos de OUTRO form (ex.: MotivoLancamento
+            // obrigatório), mesmo esse aqui estando correto.
+            if (SaldoInicialInput < 0)
             {
                 MensagemErro = "Informe um saldo inicial válido.";
                 return RedirectToPage();
@@ -75,7 +79,7 @@ namespace EmporioGege.Pages.Caixa.Turno
 
         public async Task<IActionResult> OnPostLancamentoAsync(CancellationToken ct)
         {
-            if (!ModelState.IsValid)
+            if (ValorLancamento <= 0 || string.IsNullOrWhiteSpace(MotivoLancamento) || MotivoLancamento.Trim().Length < 3)
             {
                 MensagemErro = "Informe um valor e um motivo válidos para o lançamento.";
                 return RedirectToPage();
@@ -106,7 +110,7 @@ namespace EmporioGege.Pages.Caixa.Turno
                 return RedirectToPage();
             }
 
-            if (!ModelState.IsValid)
+            if (SaldoInformadoInput < 0)
             {
                 MensagemErro = "Informe o valor contado no caixa para fechar o turno.";
                 return RedirectToPage();
