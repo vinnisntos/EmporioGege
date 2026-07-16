@@ -174,6 +174,20 @@ Comandas (Pages/Caixa/Comandas e Pages/Admin/Comandas)
     canceladas), ver itens, e cancelar comanda travada aberta sem
     precisar de senha (a policy AdminOnly já garante quem chega lá).
 
+Bloqueio de login por licença (Pages/Auth/Login)
+  - Depois de autenticar no Supabase Auth e achar o perfil, se a role
+    não for "superadmin" e o perfil tiver tenant_id, busca o tenant via
+    ITenantService (Dapper/admin, não o cliente Supabase) e bloqueia o
+    login (sem gravar o cookie) se status_licenca for "suspenso" ou
+    "cancelado", ou se data_expiracao já passou. Mensagem genérica
+    "entre em contato com o suporte" pro usuário final. Superadmin fica
+    de fora da checagem de propósito (gerencia todos os tenants, não
+    pode ficar preso pela licença de um tenant específico). Testado ao
+    vivo via curl direto no /Auth/Login trocando status_licenca/
+    data_expiracao do tenant de teste (suspenso, cancelado, expirado e
+    de volta a ativo) - os 3 bloqueios disparam e o login normal
+    continua funcionando depois de restaurado.
+
 Cadastro de Lojas / Gestão de Contexto (Pages/SuperAdmin/Adegas)
   - CRUD de tenant (loja): nome fantasia, responsável, CNPJ, contatos,
     status de licença, data de expiração. Antes só dava pra criar via
@@ -315,13 +329,15 @@ conferência direto no banco) - nenhum aparecia só com "dotnet build".
 - NFC-e real: hoje só existe um flag "emitir_nota_fiscal" (marcação
   interna). Não emite nota fiscal de verdade - falta escolher um
   provedor (Focus NFe / eNotas / PlugNotas) e integrar.
-- Bloqueio de login por status_licenca/data_expiracao do tenant: os
-  campos existem e são editáveis em SuperAdmin/Adegas, mas nada ainda
-  impede login de um tenant "suspenso"/"cancelado"/expirado.
 - Testes automatizados (nenhum criado até agora).
 - Proteção contra força bruta no login.
 - Integração de pagamento (maquininha, QR code Pix) - os métodos de
   pagamento no PDV são só rótulos hoje.
+- Reimpressão manual de recibo (hoje só imprime automático na hora da
+  venda/fechamento de comanda; sem botão de reimprimir um recibo
+  antigo a partir do histórico).
+- Tela de configuração da porta da impressora dentro do sistema (hoje
+  é só appsettings.json/user-secrets, sem UI).
 
 
 6. COMO RODAR AS MIGRATIONS
@@ -330,3 +346,48 @@ Todas as migrations desta pasta são idempotentes (usam IF NOT EXISTS /
 DROP + CREATE) - seguro rodar de novo se precisar. Rodar manualmente
 no SQL Editor do Supabase, em ordem numérica (0001 até a mais recente).
 Nenhuma é executada automaticamente pela aplicação.
+
+
+7. ESTADO DA SESSÃO EM 2026-07-15 - PARA CONTINUAR AMANHÃ
+================================================================
+Tudo commitado e com push feito pro origin/main (2 commits desta
+sessão: Comandas+SuperAdmin/Adegas, e Recibo impresso). Working tree
+limpo, nada pendente de commit.
+
+Migrations rodadas nesta sessão (já aplicadas no Supabase, não
+precisa rodar de novo): 0008 e 0009.
+
+Config local desta máquina (dotnet user-secrets, NÃO versionado - se
+trocar de máquina/reinstalar, precisa configurar de novo):
+  Impressora:Habilitada = true
+  Impressora:Porta = COM4
+  Impressora:BaudRate = 9600
+  Impressora:ColunasPorLinha = 32
+A impressora térmica Bluetooth (Leopardo/"MPT-III") está pareada no
+Windows desta máquina como COM4 - pareamento Bluetooth normalmente
+sobrevive a reinício do PC, mas se a porta mudar (ex.: repareou o
+dispositivo), atualizar com:
+  dotnet user-secrets set "Impressora:Porta" "COMx"
+(rodar dentro da pasta EmporioGege/, onde fica o .csproj)
+
+Credenciais de teste: Database/Migrations/CREDENCIAIS_TESTE.local.txt
+(gitignored, não commitado - só existe nesta máquina).
+
+Dados de teste ficaram DE PROPÓSITO no tenant do caixa01 (usuário
+pediu pra não limpar, vai usar pra coletar dados no painel de admin
+depois): produto de teste, várias vendas de teste (incluindo as do
+teste de impressão), e comandas de teste já fechadas/canceladas.
+O perfil superadmin também ficou com tenant_id fixo (migration 0009) -
+reversível com `UPDATE profiles SET tenant_id = NULL WHERE role =
+'superadmin';` se algum dia isso for indesejado.
+
+Backlog restante pra continuar (ver seção 5, sem ordem definida ainda):
+NFC-e real, testes automatizados, proteção contra força bruta no
+login, integração de pagamento real, reimpressão manual de recibo,
+tela de configuração da porta da impressora.
+
+Depois desta atualização (bloqueio de login por licença, ver seção 3):
+mudança em Pages/Auth/Login.cshtml.cs, sem migration nova (usa
+status_licenca/data_expiracao que já existiam). Não commitado ainda -
+verificar `git status` na raiz do repo (Database/Migrations/README.txt
+e EmporioGege/Pages/Auth/Login.cshtml.cs) antes de continuar.

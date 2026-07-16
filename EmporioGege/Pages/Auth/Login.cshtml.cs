@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
+using EmporioGege.Core.Interfaces;
 using EmporioGege.Models;
 
 namespace EmporioGege.Pages.Auth
@@ -11,10 +12,12 @@ namespace EmporioGege.Pages.Auth
     public class LoginModel : PageModel
     {
         private readonly Supabase.Client _supabase;
+        private readonly ITenantService _tenantService;
 
-        public LoginModel(Supabase.Client supabase)
+        public LoginModel(Supabase.Client supabase, ITenantService tenantService)
         {
             _supabase = supabase;
+            _tenantService = tenantService;
         }
 
         [BindProperty]
@@ -67,6 +70,29 @@ namespace EmporioGege.Pages.Auth
                 {
                     MensagemErro = "Perfil não encontrado no sistema.";
                     return Page();
+                }
+
+                // 2.5. Bloqueia login se a licença da loja estiver suspensa/cancelada/expirada.
+                // Superadmin fica de fora: ele gerencia todas as lojas e não deve ficar preso
+                // pela licença de uma loja específica (mesmo tendo tenant_id vinculado nos dados de teste).
+                if (resultadoPerfil.Role != "superadmin" && !string.IsNullOrEmpty(resultadoPerfil.TenantId)
+                    && Guid.TryParse(resultadoPerfil.TenantId, out var tenantId))
+                {
+                    var tenant = await _tenantService.ObterAsync(tenantId);
+                    if (tenant != null)
+                    {
+                        MensagemErro = tenant.StatusLicenca switch
+                        {
+                            "suspenso" => "Acesso suspenso. Entre em contato com o suporte.",
+                            "cancelado" => "Acesso cancelado. Entre em contato com o suporte.",
+                            _ when tenant.DataExpiracao.Date < DateTime.UtcNow.Date =>
+                                "Licença expirada. Entre em contato com o suporte.",
+                            _ => null
+                        };
+
+                        if (MensagemErro != null)
+                            return Page();
+                    }
                 }
 
                 // 3. Cria as credenciais (Claims) para salvar no Cookie do navegador de forma segura
