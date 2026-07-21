@@ -86,7 +86,7 @@ limit, sem exceção no log do servidor. Onboarding de funcionário/loja
 não deve mais travar por esse motivo.
 
 
-2. ONBOARDING SELF-SERVICE E COBRANÇA — PARCIALMENTE RESOLVIDO EM 2026-07-21
+2. ONBOARDING SELF-SERVICE E COBRANÇA — RESOLVIDO EM 2026-07-21
 ================================================================
 Este é o item que mais importa se a intenção é "vender por
 assinatura" no sentido literal (cliente se cadastra, escolhe um plano,
@@ -119,31 +119,56 @@ instância real). Cadeia completa validada: domínio → HTTPS → app →
 rota do webhook → autenticação → processamento. A automação de
 cobrança/status_licenca está pronta pra uso real de ponta a ponta.
 
-O que AINDA NÃO existe (self-service completo, nem tela de pagamento):
-  - Fluxo de autocadastro (o dono de uma adega se cadastrar sozinho,
-    sem depender de alguém com acesso de superadmin).
-  - Tela pública de preços/escolha de plano antes do cadastro.
-  - Cobrança automática NA CRIAÇÃO da loja (hoje o superadmin ainda
-    aciona "criar assinatura" manualmente depois de cadastrar).
+CADASTRO SELF-SERVICE PÚBLICO — IMPLEMENTADO E TESTADO EM 2026-07-21:
+página pública `/CadastroLoja` (acessível pelos botões "Assinar o
+Start/Pro/Enterprise" na seção Planos da landing, com o plano já
+pré-selecionado) onde o próprio dono da loja se cadastra sozinho, sem
+nenhum superadmin envolvido. Numa única requisição, o sistema cria:
+(1) o tenant, (2) o login dele como administrador via Supabase Auth,
+e (3) a assinatura de verdade no Asaas — reaproveitando o mesmo
+`FaturamentoService` já usado pelo fluxo manual do superadmin. O
+preço de cada plano é resolvido no SERVIDOR (nunca aceito de um
+campo do formulário, pra ninguém conseguir mandar "Enterprise" pelo
+preço do "Start"). Novo status de licença "pendente": a loja fica
+bloqueada no login até o webhook do Asaas confirmar o primeiro
+pagamento (nenhuma mudança precisou ser feita no webhook em si — ele
+já seta "ativo" incondicionalmente em PAYMENT_CONFIRMED/RECEIVED, a
+transição pendente→ativo "só funcionou" reaproveitando esse código).
+Rate limiter dedicado (3 tentativas/hora por e-mail, 5/hora por IP) e
+uma checagem de duplicidade (mesmo e-mail/CNPJ) evitam abuso e
+reenvio duplicado.
+
+Testado ao vivo de ponta a ponta contra o Asaas SANDBOX (trocado
+temporariamente do produção pro sandbox só durante o teste, restaurado
+depois): cadastro real criado no banco (tenant "pendente", plano/valor
+corretos, profile com role=administrador vinculado corretamente,
+cliente+assinatura reais no Asaas sandbox), tentativa de reenvio com
+mesmo e-mail/CNPJ bloqueada pelo guard de duplicidade, 4ª tentativa de
+cadastro em menos de uma hora bloqueada pelo rate limiter, e webhook
+PAYMENT_CONFIRMED simulado confirmando a transição automática
+pendente→ativo (com data_expiracao calculada corretamente).
+
+Limitação aceita e documentada (não construído: rollback/transação
+entre sistemas, já que Postgres+Supabase Auth+Asaas não compartilham
+uma transação de verdade): se uma etapa DEPOIS da criação do tenant
+falhar (login Supabase, vínculo do perfil, ou a assinatura no Asaas),
+o cadastro fica parcialmente feito - recuperável manualmente via
+SuperAdmin/Adegas (entrar na loja + criar o login em Admin/Funcionarios,
+ou só clicar "Criar Assinatura" se só essa última etapa falhou).
+
+O que AINDA NÃO existe:
   - Taxa de implantação/setup (cobrança única) — mencionada pelo
     usuário como parte do modelo comercial, ainda não implementada.
-  - NENHUMA TELA DE PAGAMENTO DENTRO DO PENDURAI: o sistema só cria a
-    assinatura no Asaas e escuta o webhook de status — quem realmente
-    cobra o lojista (boleto/Pix/link de cartão) é o próprio Asaas,
-    pelos canais dele (e-mail/WhatsApp cadastrados no cliente), fora
-    do PendurAi. Não existe, hoje: tela do administrador da loja pra
-    ver sua própria assinatura/fatura/vencimento, link de pagamento
-    exibido dentro do sistema, nem aviso de fatura vencida além do
-    bloqueio de login já existente quando status_licenca vira
-    suspenso/cancelado. Se o objetivo é o lojista ver e pagar a
-    fatura sem sair do PendurAi, falta construir essa tela.
-
-Se a venda for feita via contato comercial direto (você cadastrando
-cada cliente manualmente), o que já foi feito é suficiente — a
-cobrança recorrente já roda sozinha depois do cadastro. Se a ideia for
-venda self-service de verdade (o cliente se cadastra e paga sozinho,
-sem você no meio), ainda falta construir o cadastro público + escolha
-de plano antes de qualquer contato humano.
+  - NENHUMA TELA DE PAGAMENTO/FATURA DENTRO DO PENDURAI: o sistema cria
+    a assinatura no Asaas e escuta o webhook de status — quem realmente
+    cobra o lojista (boleto/Pix/link de cartão) é o próprio Asaas, pelos
+    canais dele (e-mail/WhatsApp cadastrados no cliente), fora do
+    PendurAi. Não existe tela do administrador da loja pra ver sua
+    própria assinatura/fatura/vencimento, link de pagamento exibido
+    dentro do sistema, nem aviso de fatura vencida além do bloqueio de
+    login já existente quando status_licenca vira suspenso/cancelado/
+    pendente. Se o objetivo é o lojista ver e pagar a fatura sem sair
+    do PendurAi, falta construir essa tela.
 
 
 3. NFC-E REAL (EMISSÃO FISCAL) — EM ANDAMENTO, PAUSADO EM 2026-07-21
@@ -297,10 +322,9 @@ RESUMO — ORDEM DE PRIORIDADE SUGERIDA
    upgrade do pacote JWT vulnerável, seção 8, e um pentest/auditoria
    externa antes do lançamento comercial)
 3. Tela de configuração de impressora
-4. Onboarding self-service completo (seção 2) — só se a venda for
-   self-service de verdade (cadastro público sem superadmin); a
-   automação de cobrança de loja já cadastrada já está pronta e
-   testada de ponta a ponta em produção
+4. Tela de fatura/assinatura in-app pro lojista (seção 2) — última
+   peça pra fechar o ciclo self-service sem depender de nenhum canal
+   fora do PendurAi
 
 Pendências de custo, retomar quando houver orçamento (não bloqueiam
 o lançamento "cru" combinado com o usuário):
@@ -312,5 +336,7 @@ Já corrigido: SMTP próprio (seção 1); proteção contra força bruta no
 login (seção 5) e na senha de supervisor (seção 0, auditoria de
 2026-07-20); automação de cobrança/assinatura via Asaas pra lojas já
 cadastradas, incluindo webhook de produção testado de ponta a ponta
-(seção 2); hospedagem/deploy em produção (seção 8.5) — publicado em
+(seção 2); cadastro self-service público via /CadastroLoja, testado de
+ponta a ponta (tenant + login + assinatura + webhook, seção 2);
+hospedagem/deploy em produção (seção 8.5) — publicado em
 https://pendurai.vinnisantos.com.br com HTTPS válido.

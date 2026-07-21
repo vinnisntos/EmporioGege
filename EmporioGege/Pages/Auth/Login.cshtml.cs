@@ -97,6 +97,11 @@ namespace EmporioGege.Pages.Auth
                         {
                             "suspenso" => "Acesso suspenso. Entre em contato com o suporte.",
                             "cancelado" => "Acesso cancelado. Entre em contato com o suporte.",
+                            // Precisa vir ANTES do "_ when" de expiração abaixo: um tenant recém-
+                            // cadastrado via autocadastro (CadastroLojaService) tem DataExpiracao
+                            // seedada com a data de criação, que cairia como "expirada" já no dia
+                            // seguinte se essa checagem não tivesse prioridade sobre aquela.
+                            "pendente" => "Cadastro em análise: estamos aguardando a confirmação do primeiro pagamento. Você receberá um e-mail assim que for confirmado.",
                             _ when tenant.DataExpiracao.Date < DateTime.UtcNow.Date =>
                                 "Licença expirada. Entre em contato com o suporte.",
                             _ => null

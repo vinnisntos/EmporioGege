@@ -82,6 +82,8 @@ builder.Services.AddScoped<IConfiguracaoFiscalService, ConfiguracaoFiscalService
 // usuário 2026-07-21: só automatiza a cobrança de lojas já cadastradas manualmente pelo
 // superadmin, não é o cadastro self-service completo (ver Application/Services/
 // FaturamentoService.cs e a seção "Assinatura/Cobrança" em SuperAdmin/Adegas/Editar).
+// ATUALIZAÇÃO: cadastro self-service público adicionado depois - ver CadastroLojaService,
+// que reaproveita este mesmo IFaturamentoService pra criar a assinatura na hora do cadastro.
 builder.Services.Configure<AsaasOptions>(builder.Configuration.GetSection("Asaas"));
 builder.Services.AddHttpClient<IAsaasClient, AsaasClient>((sp, client) =>
 {
@@ -95,6 +97,11 @@ builder.Services.AddHttpClient<IAsaasClient, AsaasClient>((sp, client) =>
 });
 builder.Services.AddScoped<IFaturamentoService, FaturamentoService>();
 builder.Services.AddScoped<IAsaasWebhookService, AsaasWebhookService>();
+
+// Cadastro self-service público (Pages/CadastroLoja) - cria tenant + login administrador +
+// assinatura Asaas numa única requisição, sem nenhum superadmin envolvido.
+builder.Services.AddSingleton<CadastroLojaTentativaLimiter>();
+builder.Services.AddScoped<ICadastroLojaService, CadastroLojaService>();
 
 builder.Services.AddSingleton<IRelatorioExportService, RelatorioExportService>();
 
