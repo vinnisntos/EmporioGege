@@ -109,10 +109,15 @@ de verdade, os três eventos de webhook testados e confirmados).
 
 ATUALIZAÇÃO 2026-07-21: token trocado de sandbox para a conta de
 PRODUÇÃO real do Asaas — a partir de agora, criar assinatura aqui
-gera cobrança e cliente DE VERDADE. O webhook de produção ainda
-precisa ser configurado no painel do Asaas (URL + token de
-confirmação) antes do primeiro uso real; até lá, o webhook local
-continua configurado só para o sandbox.
+gera cobrança e cliente DE VERDADE.
+
+RESOLVIDO 2026-07-21 (mais tarde no mesmo dia): webhook de produção
+cadastrado via API do Asaas e testado de ponta a ponta em produção —
+token correto retorna 200, token errado/ausente retorna 401 (mesmo
+comportamento de segurança do sandbox, confirmado agora rodando na
+instância real). Cadeia completa validada: domínio → HTTPS → app →
+rota do webhook → autenticação → processamento. A automação de
+cobrança/status_licenca está pronta pra uso real de ponta a ponta.
 
 O que AINDA NÃO existe (self-service completo, nem tela de pagamento):
   - Fluxo de autocadastro (o dono de uma adega se cadastrar sozinho,
@@ -243,18 +248,17 @@ do código, via HTTP/TLS diretos):
     aceita POST) e 401 em POST sem o token correto (validação de
     segurança ativa).
 
-Ainda falta, antes do primeiro uso real:
-  - Confirmar que as variáveis de ambiente de produção estão setadas
-    na instância (ASPNETCORE_ENVIRONMENT=Production +
-    ConnectionStrings__SupabasePostgres, Asaas__Token=producao,
-    Asaas__Ambiente=producao, Fiscal__ChaveCriptografia — os mesmos
-    valores que hoje só existem no user-secrets LOCAL do assistente).
-  - Registrar o webhook no painel de PRODUÇÃO do Asaas usando a URL
-    https://pendurai.vinnisantos.com.br/webhooks/asaas, selecionando
-    os eventos PAYMENT_CONFIRMED, PAYMENT_RECEIVED, PAYMENT_OVERDUE,
-    SUBSCRIPTION_DELETED, SUBSCRIPTION_INACTIVATED, e gerando um token
-    lá — depois setar esse valor como Asaas__WebhookToken na instância
-    (hoje ainda está com o token de sandbox).
+WEBHOOK CADASTRADO E TESTADO EM 2026-07-21 via API do Asaas (não pelo
+painel): id 840d81e3-a85c-412e-b82f-d5493695e19f, url
+https://pendurai.vinnisantos.com.br/webhooks/asaas, enabled=true,
+eventos PAYMENT_CONFIRMED/PAYMENT_RECEIVED/PAYMENT_OVERDUE/
+SUBSCRIPTION_DELETED/SUBSCRIPTION_INACTIVATED. O token gerado foi
+passado direto pro usuário no chat (não fica escrito aqui - este
+arquivo é público no GitHub) - já salvo também no user-secrets local
+do assistente como Asaas:WebhookToken, e confirmado configurado na
+instância: teste real contra a URL de produção com o token correto
+retornou 200, com token errado/ausente retornou 401. Cadeia completa
+funcionando de ponta a ponta.
 
 
 8. REVISÃO DE SEGURANÇA GERAL
@@ -287,28 +291,26 @@ feitos, mesmo nesta fase inicial.
 
 RESUMO — ORDEM DE PRIORIDADE SUGERIDA
 ================================================================
-1. Webhook de produção do Asaas (seção 2/8.5) — hospedagem já
-   resolvida (https://pendurai.vinnisantos.com.br, HTTPS válido);
-   falta só registrar o webhook no painel de produção do Asaas e
-   confirmar as variáveis de ambiente na instância.
-2. Testes automatizados (confirmado pelo usuário como prioridade,
+1. Testes automatizados (confirmado pelo usuário como prioridade,
    mesmo na fase inicial "crua")
-3. Revisão de segurança formal (confirmado pelo usuário; inclui
+2. Revisão de segurança formal (confirmado pelo usuário; inclui
    upgrade do pacote JWT vulnerável, seção 8, e um pentest/auditoria
    externa antes do lançamento comercial)
-4. Tela de configuração de impressora
-5. Onboarding self-service completo (seção 2) — só se a venda for
+3. Tela de configuração de impressora
+4. Onboarding self-service completo (seção 2) — só se a venda for
    self-service de verdade (cadastro público sem superadmin); a
-   automação de cobrança de loja já cadastrada já está pronta
+   automação de cobrança de loja já cadastrada já está pronta e
+   testada de ponta a ponta em produção
 
 Pendências de custo, retomar quando houver orçamento (não bloqueiam
 o lançamento "cru" combinado com o usuário):
-6. NFC-e real via Focus NFe (seção 3) — mensalidade recorrente por
+5. NFC-e real via Focus NFe (seção 3) — mensalidade recorrente por
    loja, sem plano gratuito
-7. Integração de pagamento real no PDV (seção 4) — maquininha/Pix
+6. Integração de pagamento real no PDV (seção 4) — maquininha/Pix
 
 Já corrigido: SMTP próprio (seção 1); proteção contra força bruta no
 login (seção 5) e na senha de supervisor (seção 0, auditoria de
 2026-07-20); automação de cobrança/assinatura via Asaas pra lojas já
-cadastradas (seção 2); hospedagem/deploy em produção (seção 8.5) —
-publicado em https://pendurai.vinnisantos.com.br com HTTPS válido.
+cadastradas, incluindo webhook de produção testado de ponta a ponta
+(seção 2); hospedagem/deploy em produção (seção 8.5) — publicado em
+https://pendurai.vinnisantos.com.br com HTTPS válido.
