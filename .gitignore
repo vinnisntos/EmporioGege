@@ -9,6 +9,9 @@
 # Credenciais de teste locais — nunca commitar (ver Database/Migrations/README.txt)
 *.local.txt
 
+# Diário de sessão local (histórico narrativo de decisões/bugs) — nunca vai pro GitHub
+Database/Migrations/README.txt
+
 # User-specific files
 *.rsuser
 *.suo

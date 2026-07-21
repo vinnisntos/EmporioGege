@@ -107,7 +107,14 @@ mais editar esse campo manualmente. Testado de ponta a ponta contra o
 ambiente sandbox real do Asaas (cliente e assinatura de teste criados
 de verdade, os três eventos de webhook testados e confirmados).
 
-O que AINDA NÃO existe (self-service completo):
+ATUALIZAÇÃO 2026-07-21: token trocado de sandbox para a conta de
+PRODUÇÃO real do Asaas — a partir de agora, criar assinatura aqui
+gera cobrança e cliente DE VERDADE. O webhook de produção ainda
+precisa ser configurado no painel do Asaas (URL + token de
+confirmação) antes do primeiro uso real; até lá, o webhook local
+continua configurado só para o sandbox.
+
+O que AINDA NÃO existe (self-service completo, nem tela de pagamento):
   - Fluxo de autocadastro (o dono de uma adega se cadastrar sozinho,
     sem depender de alguém com acesso de superadmin).
   - Tela pública de preços/escolha de plano antes do cadastro.
@@ -115,6 +122,16 @@ O que AINDA NÃO existe (self-service completo):
     aciona "criar assinatura" manualmente depois de cadastrar).
   - Taxa de implantação/setup (cobrança única) — mencionada pelo
     usuário como parte do modelo comercial, ainda não implementada.
+  - NENHUMA TELA DE PAGAMENTO DENTRO DO PENDURAI: o sistema só cria a
+    assinatura no Asaas e escuta o webhook de status — quem realmente
+    cobra o lojista (boleto/Pix/link de cartão) é o próprio Asaas,
+    pelos canais dele (e-mail/WhatsApp cadastrados no cliente), fora
+    do PendurAi. Não existe, hoje: tela do administrador da loja pra
+    ver sua própria assinatura/fatura/vencimento, link de pagamento
+    exibido dentro do sistema, nem aviso de fatura vencida além do
+    bloqueio de login já existente quando status_licenca vira
+    suspenso/cancelado. Se o objetivo é o lojista ver e pagar a
+    fatura sem sair do PendurAi, falta construir essa tela.
 
 Se a venda for feita via contato comercial direto (você cadastrando
 cada cliente manualmente), o que já foi feito é suficiente — a
@@ -149,6 +166,10 @@ registro de empresa, e a CHAMADA DE EMISSÃO da nota em si (na hora de
 fechar uma venda) ainda não foi implementada — só o cadastro da
 empresa. Retomar quando o modelo de custo por loja/mensalidade
 justificar o gasto.
+
+RECONFIRMADO 2026-07-21 (mesmo dia, no contexto da mudança do Asaas
+pra produção): NFC-e continua fora do escopo por falta de
+investimento financeiro — nenhuma mudança nesta decisão.
 
 
 4. INTEGRAÇÃO DE PAGAMENTO NO PDV — CONFIRMADO FORA DO ESCOPO POR ENQUANTO
@@ -200,6 +221,38 @@ Cada loja nova com impressora precisa de alguém com acesso técnico
 pra configurar a porta manualmente.
 
 
+8.5. HOSPEDAGEM / DEPLOY EM PRODUÇÃO — DESCOBERTO EM 2026-07-21, NENHUMA SOLUÇÃO EXISTE AINDA
+================================================================
+Achado ao tentar resolver a configuração do webhook de produção do
+Asaas: o PendurAi hoje só roda localmente (`dotnet run`, localhost) —
+não existe Dockerfile, pipeline de CI/CD, appsettings de produção,
+nem qualquer domínio/servidor configurado no repositório. Isso é mais
+fundamental do que qualquer outro item desta lista: nenhum cliente
+consegue usar (nem pagar por) um sistema que só roda no notebook do
+desenvolvedor, e o webhook do Asaas não tem como chamar um localhost
+pela internet — ou seja, a pendência do webhook de produção (seção 2)
+depende DIRETAMENTE de resolver isso primeiro.
+
+DECIDIDO 2026-07-21: vai subir numa instância EC2 da AWS que o
+usuário já tem ativa, com deploy configurado por ele mesmo (fora do
+escopo do assistente — sem acesso à conta AWS). Falta ainda:
+  - Domínio/subdomínio apontando pro IP público da instância (avaliar
+    se reaproveita vinnisantos.com.br, já usado pro Resend, ou registra
+    um novo pro produto).
+  - HTTPS na frente da instância (EC2 sozinho não tem certificado —
+    precisa de Nginx+Let's Encrypt na própria instância, ou um Load
+    Balancer com ACM na frente). Obrigatório pro webhook do Asaas.
+  - Configuração das variáveis de ambiente de produção na instância
+    (ASPNETCORE_ENVIRONMENT=Production + os mesmos segredos hoje só
+    no user-secrets LOCAL do assistente: ConnectionStrings__
+    SupabasePostgres, Asaas__Token, Asaas__Ambiente, Asaas__
+    WebhookToken, Fiscal__ChaveCriptografia — user-secrets é só pra
+    ambiente de desenvolvimento local, não chega na instância sozinho).
+  - Depois disso: registrar o webhook no painel de PRODUÇÃO do Asaas
+    (URL pública + gerar um token lá) e setar esse token como
+    Asaas__WebhookToken na instância.
+
+
 8. REVISÃO DE SEGURANÇA GERAL
 ================================================================
 O sistema já passou por várias correções de segurança ao longo do
@@ -212,11 +265,13 @@ lidar com dados financeiros e de clientes de terceiros.
 
 DECISÕES DE PROVEDOR JÁ TOMADAS (2026-07-21): NFC-e via Focus NFe
 (só emissão de NFC-e, nenhum outro serviço deles) — integração
-iniciada, pausada por custo (ver seção 3). Cobrança/assinatura via
-Asaas (conta já criada, ambiente sandbox) — automação de cobrança de
-loja já cadastrada IMPLEMENTADA E TESTADA (seção 2). SMTP próprio via
-Resend (domínio já verificado, reaproveitado de outra aplicação) —
-IMPLEMENTADO E TESTADO (seção 1).
+iniciada, pausada por custo, reconfirmado no mesmo dia (ver seção 3).
+Cobrança/assinatura via Asaas — automação de cobrança de loja já
+cadastrada IMPLEMENTADA E TESTADA em sandbox (seção 2); token trocado
+pra conta de PRODUÇÃO real no mesmo dia, faltando só configurar o
+webhook de produção no painel do Asaas antes do primeiro uso real.
+SMTP próprio via Resend (domínio já verificado, reaproveitado de
+outra aplicação) — IMPLEMENTADO E TESTADO (seção 1).
 
 DECISÃO DE ESCOPO 2026-07-21 ("o SaaS será meio cru no início, pois
 não temos financeiro pra arcar com custos de API de terceiros"):
@@ -228,13 +283,17 @@ feitos, mesmo nesta fase inicial.
 
 RESUMO — ORDEM DE PRIORIDADE SUGERIDA
 ================================================================
-1. Testes automatizados (confirmado pelo usuário como prioridade,
+1. Hospedagem/deploy em produção (seção 8.5) — BLOQUEIA literalmente
+   tudo mais nesta lista: sem isso não há webhook do Asaas funcionando
+   de verdade, nem cliente nenhum usando o sistema fora do notebook do
+   desenvolvedor. Descoberto em 2026-07-21, ainda sem decisão.
+2. Testes automatizados (confirmado pelo usuário como prioridade,
    mesmo na fase inicial "crua")
-2. Revisão de segurança formal (confirmado pelo usuário; inclui
+3. Revisão de segurança formal (confirmado pelo usuário; inclui
    upgrade do pacote JWT vulnerável, seção 8, e um pentest/auditoria
    externa antes do lançamento comercial)
-3. Tela de configuração de impressora
-4. Onboarding self-service completo (seção 2) — só se a venda for
+4. Tela de configuração de impressora
+5. Onboarding self-service completo (seção 2) — só se a venda for
    self-service de verdade (cadastro público sem superadmin); a
    automação de cobrança de loja já cadastrada já está pronta
 
