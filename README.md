@@ -5,12 +5,13 @@
 ![Razor Pages](https://img.shields.io/badge/ASP.NET%20Core-Razor%20Pages-512BD4?logo=dotnet&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20Auth-3ECF8E?logo=supabase&logoColor=white)
 ![Bootstrap](https://img.shields.io/badge/Bootstrap-5-7952B3?logo=bootstrap&logoColor=white)
-![Status](https://img.shields.io/badge/status-em%20desenvolvimento-yellow)
+![Status](https://img.shields.io/badge/status-beta-orange)
+![Hospedagem](https://img.shields.io/badge/AWS%20EC2-online-success?logo=amazonaws&logoColor=white)
 ![License](https://img.shields.io/badge/license-proprietary-red)
 
 Sistema completo de **Frente de Caixa (PDV)** e **Retaguarda (ERP)**, multi-tenant, para automatizar a operação de adegas e mercados de pequeno/médio porte — da venda rápida no balcão ao controle detalhado de estoque, fiado, turno de caixa e comandas.
 
-> O repositório se chama `EmporioGege` por motivo histórico (nome da loja piloto usada no desenvolvimento). O produto comercial é o **PendurAi**, desenhado desde o início para ser vendido a múltiplas lojas.
+> O repositório se chama `EmporioGege` por motivo histórico (nome da loja piloto usada no desenvolvimento). O produto comercial é o **PendurAi**, desenhado desde o início para ser vendido a múltiplas lojas, e já está no ar em **[pendurai.vinnisantos.com.br](https://pendurai.vinnisantos.com.br)**.
 
 ---
 
@@ -31,11 +32,14 @@ Sistema completo de **Frente de Caixa (PDV)** e **Retaguarda (ERP)**, multi-tena
 | 💰 **Caixa Cego** | Abertura/fechamento de turno com contagem cega (sem ver o saldo esperado), sangria/suprimento em ledger imutável, detecção automática de quebra de caixa. |
 | 📦 **Estoque com Fator de Conversão** | Produto cadastrado na unidade mínima (ex: lata) e vendido em variações (ex: fardo com 12), com abatimento automático e Kardex (auditoria) de todo movimento. |
 | 🤝 **Carteira / Fiado** | Limite de crédito por cliente, cadastro com CPF/RG, saldo devedor, extrato detalhado e baixa parcial ou total direto no caixa. |
-| 🧾 **Extrato de Vendas** | Listagem por período com detalhe de itens e reimpressão manual de recibo a partir de uma venda já registrada. |
+| 🧾 **Extrato de Vendas** | Listagem por período com detalhe de itens, reimpressão manual de recibo e exportação em Excel/PDF/XML/CSV. |
+| 📥 **Entrada de Estoque & Auditoria** | Registro de reposição/compra com justificativa, e histórico completo de toda movimentação (entrada, saída por venda, ajuste manual) com exportação. |
+| 🏆 **Produtos Mais Vendidos** | Ranking por quantidade vendida em qualquer período, exportável em Excel/PDF/XML/CSV. |
 | 🖨️ **Recibo Impresso** | Impressão térmica automática (ESC/POS) via porta serial/Bluetooth ao fechar venda ou comanda. |
-| 📊 **Dashboard Administrativo** | Receita, CMV, lucro bruto, ROI, alertas de estoque mínimo, validade próxima, saldo de fiado e comandas ativas. |
+| 📊 **Dashboard Administrativo** | Receita (dia/semana/mês), CMV, lucro bruto, ROI, alertas de estoque mínimo, validade próxima, saldo de fiado e comandas ativas. |
 | 🏢 **Multi-tenant & SuperAdmin** | Isolamento de dados por loja (`tenant_id`), painel de superadmin para cadastrar lojas e "entrar" em qualquer uma para suporte/configuração. |
-| 🔐 **Acesso & Licenciamento** | Papéis vendedor/administrador/superadmin via Supabase Auth + Claims/Policies; login bloqueado automaticamente para licença suspensa/cancelada/expirada. |
+| 🔐 **Acesso & Licenciamento** | Papéis vendedor/administrador/superadmin via Supabase Auth + Claims/Policies; login bloqueado automaticamente para licença suspensa/cancelada/expirada; proteção contra força bruta no login e na senha de supervisor. |
+| 💳 **Cobrança Recorrente (Asaas)** | Assinatura e cobrança automatizada por loja via Asaas (produção), com webhook atualizando o status da licença sozinho conforme o pagamento é confirmado, vence ou é cancelado. |
 | 🚚 **Integração Zé Delivery** | Recebimento de pedidos via webhook (fila durável + background service, assinatura HMAC, rate limiting). |
 
 ## 🏗️ Arquitetura
@@ -60,13 +64,19 @@ Todas as lojas (tenants) compartilham o mesmo schema Postgres; o isolamento é f
 
 ## 🚧 Status do Projeto
 
-O sistema já cobre o fluxo operacional completo de uma loja (PDV, turno, estoque, fiado, comandas, dashboard) e foi validado em testes ponta a ponta. Antes de uma venda comercial mais ampla, os principais pontos em aberto são:
+O sistema cobre o fluxo operacional completo de uma loja (PDV, turno, estoque, fiado, comandas, dashboard, relatórios) e está **hospedado e rodando em produção** em [pendurai.vinnisantos.com.br](https://pendurai.vinnisantos.com.br) (AWS EC2, HTTPS válido), com cobrança recorrente automatizada via Asaas testada de ponta a ponta no ambiente real.
 
-- Emissão fiscal (NFC-e) real
-- Integração de pagamento (maquininha/Pix) no PDV
-- SMTP próprio para e-mails transacionais
-- Onboarding self-service de loja + cobrança automatizada
-- Testes automatizados e proteção contra força bruta no login
+**Já resolvido** (itens que antes apareciam como pendência):
+- ✅ SMTP próprio para e-mails transacionais (Resend)
+- ✅ Proteção contra força bruta no login e na senha de supervisor
+- ✅ Cobrança automatizada por assinatura via Asaas, em produção
+- ✅ Hospedagem e deploy público (AWS EC2 + domínio + HTTPS)
+
+**Ainda em aberto** antes de uma venda comercial mais ampla:
+- Testes automatizados (prioridade atual)
+- Revisão de segurança formal (pentest/auditoria externa)
+- Onboarding self-service de loja (autocadastro público, sem depender de superadmin)
+- Emissão fiscal (NFC-e) real e integração de pagamento (maquininha/Pix) no PDV — **conscientemente adiadas por custo de API de terceiros**, não são bugs
 
 A lista completa e priorizada de pendências está em [`pendencias.txt`](./pendencias.txt).
 
