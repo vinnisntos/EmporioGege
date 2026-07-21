@@ -31,6 +31,12 @@
         <div class="col-auto">
             <button type="submit" class="btn btn-warning fw-semibold">Filtrar</button>
         </div>
+        <div class="col-auto d-flex gap-2">
+            <a class="btn btn-outline-light btn-sm" href="?handler=ExportarXlsx&De=@Model.De&Ate=@Model.Ate"><i class="bi bi-file-earmark-excel me-1"></i>XLSX</a>
+            <a class="btn btn-outline-light btn-sm" href="?handler=ExportarPdf&De=@Model.De&Ate=@Model.Ate"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
+            <a class="btn btn-outline-light btn-sm" href="?handler=ExportarCsv&De=@Model.De&Ate=@Model.Ate"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+            <a class="btn btn-outline-light btn-sm" href="?handler=ExportarXml&De=@Model.De&Ate=@Model.Ate"><i class="bi bi-file-earmark-code me-1"></i>XML</a>
+        </div>
         <div class="col-auto ms-auto text-end">
             <div class="text-muted small">Total no período</div>
             <div class="fs-5 text-white fw-semibold">@Model.TotalPeriodo.ToString("C", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))</div>

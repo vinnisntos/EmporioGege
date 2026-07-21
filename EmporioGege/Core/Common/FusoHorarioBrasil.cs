@@ -18,5 +18,13 @@ namespace EmporioGege.Core.Common
         /// <summary>Início (00:00) de um dia local, convertido pra UTC.</summary>
         public static DateTime InicioDoDiaLocalEmUtc(DateOnly diaLocal) =>
             DateTime.SpecifyKind(diaLocal.ToDateTime(TimeOnly.MinValue) - Offset, DateTimeKind.Utc);
+
+        /// <summary>Segunda-feira da semana (local) de um dia qualquer - semana corrida
+        /// segunda a domingo, mesmo padrão comercial usado no Brasil.</summary>
+        public static DateOnly InicioDaSemanaLocal(DateOnly diaLocal)
+        {
+            var diasDesdeSegunda = ((int)diaLocal.DayOfWeek + 6) % 7; // domingo=0 vira 6, segunda=1 vira 0...
+            return diaLocal.AddDays(-diasDesdeSegunda);
+        }
     }
 }

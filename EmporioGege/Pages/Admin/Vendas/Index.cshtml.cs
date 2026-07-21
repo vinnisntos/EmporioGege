@@ -8,7 +8,7 @@ using EmporioGege.Core.Interfaces;
 namespace EmporioGege.Pages.Admin.Vendas
 {
     [Authorize(Policy = "AdminOnly")]
-    public class IndexModel(IVendaService vendaService, ITenantService tenantService, ITenantProvider tenantProvider, IImpressoraReciboService impressoraReciboService) : PageModel
+    public class IndexModel(IVendaService vendaService, ITenantService tenantService, ITenantProvider tenantProvider, IImpressoraReciboService impressoraReciboService, IRelatorioExportService exportService) : PageModel
     {
         [BindProperty(SupportsGet = true)]
         public DateOnly? De { get; set; }
@@ -22,20 +22,77 @@ namespace EmporioGege.Pages.Admin.Vendas
 
         public async Task OnGetAsync(CancellationToken ct)
         {
+            Vendas = await CarregarAsync(ct);
+            TotalPeriodo = Vendas.Sum(v => v.TotalVenda);
+        }
+
+        public async Task<IActionResult> OnGetExportarXlsxAsync(CancellationToken ct)
+        {
+            var relatorio = await MontarRelatorioAsync(ct);
+            var bytes = exportService.ExportarXlsx(relatorio);
+            return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "extrato-de-vendas.xlsx");
+        }
+
+        public async Task<IActionResult> OnGetExportarPdfAsync(CancellationToken ct)
+        {
+            var relatorio = await MontarRelatorioAsync(ct);
+            var bytes = exportService.ExportarPdf(relatorio);
+            return File(bytes, "application/pdf", "extrato-de-vendas.pdf");
+        }
+
+        public async Task<IActionResult> OnGetExportarXmlAsync(CancellationToken ct)
+        {
+            var relatorio = await MontarRelatorioAsync(ct);
+            var bytes = exportService.ExportarXml(relatorio);
+            return File(bytes, "application/xml", "extrato-de-vendas.xml");
+        }
+
+        public async Task<IActionResult> OnGetExportarCsvAsync(CancellationToken ct)
+        {
+            var relatorio = await MontarRelatorioAsync(ct);
+            var bytes = exportService.ExportarCsv(relatorio);
+            return File(bytes, "text/csv", "extrato-de-vendas.csv");
+        }
+
+        // [inicio, fimExclusivo) - mesma convenção de intervalo usada no DashboardService.
+        // De/Ate são datas escolhidas pelo usuário no fuso local (loja no Brasil) - convertê-las
+        // pra UTC direto (DateTimeKind.Utc) sem ajustar o offset causava um descasamento de até
+        // 3h com a exibição (que usa .ToLocalTime()): uma venda das 23h37 local (14/07) já
+        // tinha virado dia 15 em UTC, e aparecia dentro de um filtro "De 15/07".
+        private async Task<IReadOnlyList<VendaResumoDto>> CarregarAsync(CancellationToken ct)
+        {
             var hoje = FusoHorarioBrasil.HojeLocal();
             De ??= hoje.AddDays(-6);
             Ate ??= hoje;
 
-            // [inicio, fimExclusivo) - mesma convenção de intervalo usada no DashboardService.
-            // De/Ate são datas escolhidas pelo usuário no fuso local (loja no Brasil) - convertê-las
-            // pra UTC direto (DateTimeKind.Utc) sem ajustar o offset causava um descasamento de até
-            // 3h com a exibição (que usa .ToLocalTime()): uma venda das 23h37 local (14/07) já
-            // tinha virado dia 15 em UTC, e aparecia dentro de um filtro "De 15/07".
             var inicio = FusoHorarioBrasil.InicioDoDiaLocalEmUtc(De.Value);
             var fimExclusivo = FusoHorarioBrasil.InicioDoDiaLocalEmUtc(Ate.Value.AddDays(1));
 
-            Vendas = await vendaService.ListarAsync(inicio, fimExclusivo, ct);
-            TotalPeriodo = Vendas.Sum(v => v.TotalVenda);
+            return await vendaService.ListarAsync(inicio, fimExclusivo, ct);
+        }
+
+        private async Task<RelatorioTabularDto> MontarRelatorioAsync(CancellationToken ct)
+        {
+            var vendas = await CarregarAsync(ct);
+            var cultura = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+
+            var linhas = vendas
+                .Select(v => (IReadOnlyList<string>)
+                [
+                    v.DataVenda.ToLocalTime().ToString("dd/MM/yyyy HH:mm"),
+                    v.TipoOrigem,
+                    v.MetodoPagamento ?? "",
+                    v.NumeroComanda ?? "",
+                    v.ClienteNome ?? "",
+                    v.TotalVenda.ToString("C", cultura),
+                    v.TotalCusto.ToString("C", cultura)
+                ])
+                .ToList();
+
+            return new RelatorioTabularDto(
+                $"Extrato de Vendas ({De:dd/MM/yyyy} a {Ate:dd/MM/yyyy})",
+                ["Data/Hora", "Origem", "Método Pagamento", "Comanda", "Cliente", "Total Venda", "Total Custo"],
+                linhas);
         }
 
         public async Task<JsonResult> OnGetDetalheAsync(Guid id, CancellationToken ct)

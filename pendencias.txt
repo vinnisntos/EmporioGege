@@ -71,21 +71,19 @@ ATUALIZAÇÃO 2026-07-21: proteção contra força bruta no LOGIN em si
 foi corrigida — ver seção 5 abaixo.
 
 
-1. INFRAESTRUTURA DE E-MAIL (SMTP PRÓPRIO) — BLOQUEADOR
+1. INFRAESTRUTURA DE E-MAIL (SMTP PRÓPRIO) — CORRIGIDO EM 2026-07-21
 ================================================================
-O projeto usa o serviço de e-mail padrão/compartilhado do Supabase
-Auth, que tem um limite baixo de envios por hora. Qualquer conta nova
-(funcionário criado em Admin/Funcionarios, ou qualquer outro fluxo que
-use SignUp) dispara um e-mail de confirmação por esse serviço.
+O projeto usava o serviço de e-mail padrão/compartilhado do Supabase
+Auth, que tem um limite baixo de envios por hora — batia esse limite
+("over_email_send_rate_limit") ao cadastrar funcionário com alguma
+frequência.
 
-Isso já bateu no limite durante os testes (erro "over_email_send_rate_
-limit" ao tentar cadastrar um funcionário). Em produção, com lojas
-reais cadastrando funcionários com alguma frequência, o sistema vai
-travar o cadastro depois de poucas contas.
-
-O que fazer: configurar um provedor SMTP próprio no painel do Supabase
-(SendGrid, Postmark, Amazon SES ou similar) antes de colocar o sistema
-em produção para clientes reais.
+Resolvido: SMTP próprio configurado no painel do Supabase usando
+Resend (domínio "noreply" já verificado, reaproveitado de outra
+aplicação do usuário). Testado ao vivo cadastrando um funcionário
+novo (Admin/Funcionarios) depois da configuração — sem erro de rate
+limit, sem exceção no log do servidor. Onboarding de funcionário/loja
+não deve mais travar por esse motivo.
 
 
 2. ONBOARDING SELF-SERVICE E COBRANÇA — PARCIALMENTE RESOLVIDO EM 2026-07-21
@@ -139,21 +137,32 @@ exigidos pela Focus NFe item a item na nota — ainda em branco pros
 produtos existentes, precisa de alguém com conhecimento tributário
 preencher antes da emissão funcionar de verdade.
 
-Pausado por decisão do usuário (queria focar no billing primeiro,
-"por causa dos custos da aplicação"): falta o TOKEN DE CONTA correto
-da Focus NFe (o token testado era do Asaas, colado por engano) pra
-validar o registro de empresa e a emissão de nota de ponta a ponta.
-A CHAMADA DE EMISSÃO da nota em si (na hora de fechar uma venda)
-ainda não foi implementada — só o cadastro da empresa.
+Pausado por decisão do usuário em 2026-07-21, e CONFIRMADO fora do
+escopo por enquanto por causa do custo recorrente: a Focus NFe não
+tem plano gratuito permanente (só um trial de 30 dias) — o plano de
+entrada é R$ 59,90/mês (500 NFC-e + 100 NF-e incluídas, R$0,05 por
+nota extra), o "Varejo+" (CNPJs ilimitados) é R$ 629,90/mês. Sem
+orçamento pra bancar isso por loja agora, então a integração fica
+incompleta de propósito: falta o TOKEN DE CONTA correto da Focus NFe
+(o token testado era do Asaas, colado por engano) pra validar o
+registro de empresa, e a CHAMADA DE EMISSÃO da nota em si (na hora de
+fechar uma venda) ainda não foi implementada — só o cadastro da
+empresa. Retomar quando o modelo de custo por loja/mensalidade
+justificar o gasto.
 
 
-4. INTEGRAÇÃO DE PAGAMENTO NO PDV
+4. INTEGRAÇÃO DE PAGAMENTO NO PDV — CONFIRMADO FORA DO ESCOPO POR ENQUANTO
 ================================================================
 Débito, crédito e Pix aparecem como opções no PDV, mas são só
 rótulos — não há processamento real (nem integração com maquininha,
 nem geração de QR code Pix). O caixa registra a venda como se o
 pagamento tivesse sido feito, mas não confirma o recebimento de
 verdade.
+
+Decisão do usuário em 2026-07-21: fica assim mesmo por enquanto ("o
+SaaS será meio cru no início, pois não temos financeiro pra arcar com
+custos de API de terceiros") — sem orçamento pra integrar maquininha/
+Pix real agora. Implementar futuramente quando houver orçamento.
 
 
 5. PROTEÇÃO CONTRA FORÇA BRUTA NO LOGIN — CORRIGIDO EM 2026-07-21
@@ -203,25 +212,39 @@ lidar com dados financeiros e de clientes de terceiros.
 
 DECISÕES DE PROVEDOR JÁ TOMADAS (2026-07-21): NFC-e via Focus NFe
 (só emissão de NFC-e, nenhum outro serviço deles) — integração
-iniciada, pausada até ter o token de conta correto. Cobrança/
-assinatura via Asaas (conta já criada, ambiente sandbox) — automação
-de cobrança de loja já cadastrada IMPLEMENTADA E TESTADA (seção 2).
+iniciada, pausada por custo (ver seção 3). Cobrança/assinatura via
+Asaas (conta já criada, ambiente sandbox) — automação de cobrança de
+loja já cadastrada IMPLEMENTADA E TESTADA (seção 2). SMTP próprio via
+Resend (domínio já verificado, reaproveitado de outra aplicação) —
+IMPLEMENTADO E TESTADO (seção 1).
+
+DECISÃO DE ESCOPO 2026-07-21 ("o SaaS será meio cru no início, pois
+não temos financeiro pra arcar com custos de API de terceiros"):
+NFC-e (seção 3) e pagamento real no PDV (seção 4) ficam CONSCIENTEMENTE
+como pendências de custo, não bugs — o produto sai "cru" nesses dois
+pontos até haver orçamento. Testes automatizados e revisão de
+segurança (pentest) foram confirmados como itens que DEVEM ser
+feitos, mesmo nesta fase inicial.
 
 RESUMO — ORDEM DE PRIORIDADE SUGERIDA
 ================================================================
-1. SMTP próprio (bloqueador imediato, trava cadastro de funcionário)
-2. Retomar NFC-e via Focus NFe (seção 3) — falta o token de conta
-   correto + implementar a chamada de emissão na hora da venda
-3. Integração de pagamento real no PDV
+1. Testes automatizados (confirmado pelo usuário como prioridade,
+   mesmo na fase inicial "crua")
+2. Revisão de segurança formal (confirmado pelo usuário; inclui
+   upgrade do pacote JWT vulnerável, seção 8, e um pentest/auditoria
+   externa antes do lançamento comercial)
+3. Tela de configuração de impressora
 4. Onboarding self-service completo (seção 2) — só se a venda for
    self-service de verdade (cadastro público sem superadmin); a
    automação de cobrança de loja já cadastrada já está pronta
-5. Testes automatizados
-6. Tela de configuração de impressora
-7. Revisão de segurança formal (upgrade do pacote JWT vulnerável,
-   seção 8, e um pentest/auditoria externa antes do lançamento
-   comercial)
 
-Já corrigido: proteção contra força bruta no login (seção 5) e na
-senha de supervisor (seção 0, auditoria de 2026-07-20); automação de
-cobrança/assinatura via Asaas pra lojas já cadastradas (seção 2).
+Pendências de custo, retomar quando houver orçamento (não bloqueiam
+o lançamento "cru" combinado com o usuário):
+5. NFC-e real via Focus NFe (seção 3) — mensalidade recorrente por
+   loja, sem plano gratuito
+6. Integração de pagamento real no PDV (seção 4) — maquininha/Pix
+
+Já corrigido: SMTP próprio (seção 1); proteção contra força bruta no
+login (seção 5) e na senha de supervisor (seção 0, auditoria de
+2026-07-20); automação de cobrança/assinatura via Asaas pra lojas já
+cadastradas (seção 2).

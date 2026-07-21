@@ -13,5 +13,7 @@ namespace EmporioGege.Core.Interfaces
         Task<decimal> ObterFiadoPendenteTotalAsync(CancellationToken ct = default);
 
         Task<IReadOnlyList<ProdutoValidadeDto>> ListarProdutosProximosValidadeAsync(int diasLimite = 30, CancellationToken ct = default);
+
+        Task<IReadOnlyList<ProdutoMaisVendidoDto>> ListarProdutosMaisVendidosAsync(DateTime inicio, DateTime fimExclusivo, int top, CancellationToken ct = default);
     }
 }

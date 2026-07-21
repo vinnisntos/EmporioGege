@@ -15,6 +15,7 @@ using EmporioGege.Infrastructure.Data;
 using EmporioGege.Infrastructure.Faturamento;
 using EmporioGege.Infrastructure.Fiscal;
 using EmporioGege.Infrastructure.Impressao;
+using EmporioGege.Infrastructure.Relatorios;
 using EmporioGege.Infrastructure.Tenancy;
 using EmporioGege.Infrastructure.Webhooks;
 
@@ -22,6 +23,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 // 0. Dapper não conhece DateOnly como parâmetro nativamente (ver comentário no handler).
 Dapper.SqlMapper.AddTypeHandler(new DateOnlyTypeHandler());
+
+// QuestPDF exige declarar o tipo de licença em tempo de execução - "Community" é gratuita
+// pra empresas com faturamento anual baixo (ver licença deles se o PendurAi crescer muito).
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 // 1. Configuração do Supabase (Ajustado com '!' para sumir o Warning CS8604)
 var url = builder.Configuration["Supabase:Url"]!;
@@ -41,6 +46,7 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IVendaService, VendaService>();
 builder.Services.AddScoped<ICatalogoService, CatalogoService>();
 builder.Services.AddScoped<IProdutoService, ProdutoService>();
+builder.Services.AddScoped<IEstoqueMovimentacaoService, EstoqueMovimentacaoService>();
 builder.Services.AddScoped<IFuncionarioService, FuncionarioService>();
 builder.Services.AddScoped<IClienteService, ClienteService>();
 builder.Services.AddScoped<IComandaService, ComandaService>();
@@ -89,6 +95,8 @@ builder.Services.AddHttpClient<IAsaasClient, AsaasClient>((sp, client) =>
 });
 builder.Services.AddScoped<IFaturamentoService, FaturamentoService>();
 builder.Services.AddScoped<IAsaasWebhookService, AsaasWebhookService>();
+
+builder.Services.AddSingleton<IRelatorioExportService, RelatorioExportService>();
 
 // 1.2 Permite validar o antiforgery token via header em chamadas AJAX/fetch (PDV),
 // já que essas requisições não enviam o campo de formulário __RequestVerificationToken.

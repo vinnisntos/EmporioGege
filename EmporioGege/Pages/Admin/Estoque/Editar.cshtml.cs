@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -10,6 +11,8 @@ namespace EmporioGege.Pages.Admin.Estoque
     [Authorize(Policy = "AdminOnly")]
     public class EditarModel(IProdutoService produtoService) : PageModel
     {
+        private Guid UsuarioId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
         [BindProperty(SupportsGet = true)]
         public Guid? Id { get; set; }
 
@@ -106,7 +109,7 @@ namespace EmporioGege.Pages.Admin.Estoque
                 Id, Nome, CodigoBarras, CustoMedio, PrecoVendaBase, EstoqueAtual, EstoqueMinimo,
                 UnidadeMedida, QuantidadePorCaixa, DataValidade, PrecoCaixa, PrecoAtacado, CodigoNcm, Cfop);
 
-            await produtoService.SalvarAsync(dto, ct);
+            await produtoService.SalvarAsync(dto, UsuarioId, ct);
 
             return RedirectToPage("Index");
         }

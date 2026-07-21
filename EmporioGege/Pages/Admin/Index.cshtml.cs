@@ -12,6 +12,7 @@ namespace EmporioGege.Pages.Admin
     {
         // Propriedades fortemente tipadas para o painel de UX
         public decimal FaturamentoHoje { get; set; }
+        public decimal FaturamentoSemana { get; set; }
         public decimal FiadoPendenteTotal { get; set; }
         public int AlertasEstoqueCritico { get; set; }
         public int ComandasAtivasContador { get; set; }
@@ -30,6 +31,10 @@ namespace EmporioGege.Pages.Admin
 
                 var resumoHoje = await dashboardService.ObterResumoAsync(inicioHojeUtc, inicioHojeUtc.AddDays(1), ct);
                 FaturamentoHoje = resumoHoje.Faturamento;
+
+                var inicioSemana = FusoHorarioBrasil.InicioDoDiaLocalEmUtc(FusoHorarioBrasil.InicioDaSemanaLocal(hojeLocal));
+                var resumoSemana = await dashboardService.ObterResumoAsync(inicioSemana, inicioHojeUtc.AddDays(1), ct);
+                FaturamentoSemana = resumoSemana.Faturamento;
 
                 ResumoMes = await dashboardService.ObterResumoAsync(inicioMes, proximoMes, ct);
                 FiadoPendenteTotal = await dashboardService.ObterFiadoPendenteTotalAsync(ct);

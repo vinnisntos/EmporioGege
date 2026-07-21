@@ -80,6 +80,29 @@ namespace EmporioGege.Application.Services
                 .ToList();
         }
 
+        public async Task<IReadOnlyList<ProdutoMaisVendidoDto>> ListarProdutosMaisVendidosAsync(DateTime inicio, DateTime fimExclusivo, int top, CancellationToken ct = default)
+        {
+            var tenantId = tenantProvider.RequireTenantId();
+
+            await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+            var linhas = await connection.QueryAsync<ProdutoMaisVendidoDto>(new CommandDefinition(
+                """
+                SELECT p.id AS ProdutoId, p.nome AS Nome,
+                       SUM(vi.quantidade)::int AS QuantidadeVendida, SUM(vi.subtotal) AS TotalVendido
+                FROM vendas_itens vi
+                JOIN vendas v ON v.id = vi.venda_id AND v.tenant_id = vi.tenant_id
+                JOIN produtos p ON p.id = vi.produto_id AND p.tenant_id = vi.tenant_id
+                WHERE vi.tenant_id = @TenantId AND v.status = 'FECHADA'
+                      AND v.data_venda >= @Inicio AND v.data_venda < @Fim
+                GROUP BY p.id, p.nome
+                ORDER BY QuantidadeVendida DESC
+                LIMIT @Top
+                """,
+                new { TenantId = tenantId, Inicio = inicio, Fim = fimExclusivo, Top = top }, cancellationToken: ct));
+
+            return linhas.AsList();
+        }
+
         private sealed record ResumoRow(decimal Faturamento, decimal Cmv, int TotalVendas);
 
         private sealed record ProdutoValidadeRow(Guid Id, string Nome, DateOnly DataValidade, int EstoqueAtual);

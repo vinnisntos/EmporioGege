@@ -41,7 +41,7 @@ namespace EmporioGege.Application.Services
                 new { TenantId = tenantId, Id = id }, cancellationToken: ct));
         }
 
-        public async Task<Guid> SalvarAsync(SalvarProdutoDto dto, CancellationToken ct = default)
+        public async Task<Guid> SalvarAsync(SalvarProdutoDto dto, Guid usuarioId, CancellationToken ct = default)
         {
             var tenantId = tenantProvider.RequireTenantId();
             var produtoId = dto.Id ?? Guid.NewGuid();
@@ -66,7 +66,18 @@ namespace EmporioGege.Application.Services
             }
             else
             {
-                var linhasAfetadas = await connection.ExecuteAsync(new CommandDefinition(
+                // Lido ANTES do update pra poder calcular o delta e logar como AJUSTE_MANUAL
+                // em estoque_movimentacoes - sem isso, editar o número direto no cadastro
+                // (único jeito de corrigir estoque antes desta sessão) não deixava rastro
+                // nenhum de quando/quanto/quem mudou.
+                var estoqueAnterior = await connection.QuerySingleOrDefaultAsync<int?>(new CommandDefinition(
+                    "SELECT estoque_atual FROM produtos WHERE id = @Id AND tenant_id = @TenantId FOR UPDATE",
+                    new { Id = produtoId, TenantId = tenantId }, transaction, cancellationToken: ct));
+
+                if (estoqueAnterior is null)
+                    throw new InvalidOperationException($"Produto {produtoId} não encontrado para o tenant {tenantId}.");
+
+                await connection.ExecuteAsync(new CommandDefinition(
                     """
                     UPDATE produtos SET
                         nome = @Nome, codigo_barras = @CodigoBarras, custo_medio = @CustoMedio, preco_venda_base = @PrecoVendaBase,
@@ -83,8 +94,13 @@ namespace EmporioGege.Application.Services
                     },
                     transaction, cancellationToken: ct));
 
-                if (linhasAfetadas == 0)
-                    throw new InvalidOperationException($"Produto {produtoId} não encontrado para o tenant {tenantId}.");
+                var deltaEstoque = dto.EstoqueAtual - estoqueAnterior.Value;
+                if (deltaEstoque != 0)
+                {
+                    await EstoqueMovimentacaoOperacoes.RegistrarAsync(
+                        connection, transaction, tenantId, produtoId, "AJUSTE_MANUAL", deltaEstoque,
+                        "Ajuste manual via cadastro de produto", usuarioId, ct);
+                }
             }
 
             await SalvarPrecoDiferenciadoAsync(connection, transaction, tenantId, produtoId, "CAIXA", dto.PrecoCaixa, ct);
