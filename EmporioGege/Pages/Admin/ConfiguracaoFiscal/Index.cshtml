@@ -1,0 +1,113 @@
+@page
+@model EmporioGege.Pages.Admin.ConfiguracaoFiscal.IndexModel
+@{
+    ViewData["Title"] = "Configuração Fiscal";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-0 text-white fw-bold"><i class="bi bi-file-earmark-text me-2"></i>Configuração Fiscal</h1>
+        <p class="text-muted small mb-0">Dados fiscais da loja e habilitação de NFC-e (Focus NFe).</p>
+    </div>
+    @if (Model.NfceHabilitada)
+    {
+        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-3 py-2">
+            <i class="bi bi-check-circle-fill me-1"></i> NFC-e habilitada
+        </span>
+    }
+    else
+    {
+        <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 px-3 py-2">
+            <i class="bi bi-exclamation-circle me-1"></i> NFC-e não habilitada
+        </span>
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(Model.MensagemSucesso))
+{
+    <div class="alert alert-success">@Model.MensagemSucesso</div>
+}
+@if (!string.IsNullOrEmpty(Model.MensagemErro))
+{
+    <div class="alert alert-danger">@Model.MensagemErro</div>
+}
+
+<div class="card card-custom p-4 mb-4" style="max-width: 720px;">
+    <h5 class="text-white fw-semibold mb-3">1. Dados cadastrais</h5>
+    <form method="post" asp-page-handler="Salvar">
+        <div class="row g-3">
+            <div class="col-12">
+                <label class="form-label small text-muted">Razão social</label>
+                <input asp-for="RazaoSocial" class="form-control" placeholder="Ex.: Empório Gegê Comércio de Bebidas Ltda" />
+            </div>
+
+            <div class="col-6">
+                <label class="form-label small text-muted">Regime tributário</label>
+                <select asp-for="RegimeTributario" class="form-select">
+                    <option value="0">Selecione...</option>
+                    <option value="1">Simples Nacional</option>
+                    <option value="2">Simples Nacional - excesso de sublimite</option>
+                    <option value="3">Regime Normal</option>
+                    <option value="4">MEI</option>
+                </select>
+            </div>
+            <div class="col-6">
+                <label class="form-label small text-muted">Inscrição estadual (opcional)</label>
+                <input asp-for="InscricaoEstadual" class="form-control" />
+            </div>
+
+            <div class="col-8">
+                <label class="form-label small text-muted">Logradouro</label>
+                <input asp-for="Logradouro" class="form-control" placeholder="Rua/Av." />
+            </div>
+            <div class="col-4">
+                <label class="form-label small text-muted">Número</label>
+                <input asp-for="Numero" class="form-control" />
+            </div>
+
+            <div class="col-6">
+                <label class="form-label small text-muted">Bairro</label>
+                <input asp-for="Bairro" class="form-control" />
+            </div>
+            <div class="col-6">
+                <label class="form-label small text-muted">CEP</label>
+                <input asp-for="Cep" class="form-control" placeholder="00000-000" />
+            </div>
+
+            <div class="col-8">
+                <label class="form-label small text-muted">Município</label>
+                <input asp-for="Municipio" class="form-control" />
+            </div>
+            <div class="col-4">
+                <label class="form-label small text-muted">UF</label>
+                <input asp-for="Uf" class="form-control" maxlength="2" style="text-transform: uppercase;" placeholder="Ex.: SP" />
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-warning fw-semibold px-4 mt-4">Salvar dados cadastrais</button>
+    </form>
+</div>
+
+<div class="card card-custom p-4" style="max-width: 720px;">
+    <h5 class="text-white fw-semibold mb-1">2. Certificado digital e registro na Focus NFe</h5>
+    <p class="text-muted small mb-3">
+        Salve os dados cadastrais acima primeiro. O certificado é enviado direto pra Focus NFe
+        (que passa a guardá-lo) e nunca fica gravado neste sistema - nem o arquivo, nem a senha.
+    </p>
+    <form method="post" asp-page-handler="Registrar" enctype="multipart/form-data">
+        <div class="row g-3">
+            <div class="col-8">
+                <label class="form-label small text-muted">Certificado digital (.pfx ou .p12)</label>
+                <input asp-for="Certificado" type="file" accept=".pfx,.p12" class="form-control" />
+            </div>
+            <div class="col-4">
+                <label class="form-label small text-muted">Senha do certificado</label>
+                <input asp-for="SenhaCertificado" type="password" class="form-control" />
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-outline-warning fw-semibold px-4 mt-4">
+            <i class="bi bi-cloud-upload me-1"></i> Registrar na Focus NFe
+        </button>
+    </form>
+</div>

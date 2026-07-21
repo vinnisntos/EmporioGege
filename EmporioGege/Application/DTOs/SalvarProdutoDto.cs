@@ -13,5 +13,7 @@ namespace EmporioGege.Application.DTOs
         int QuantidadePorCaixa,
         DateOnly? DataValidade,
         decimal? PrecoCaixa,
-        decimal? PrecoAtacado);
+        decimal? PrecoAtacado,
+        string? CodigoNcm,
+        string? Cfop);
 }

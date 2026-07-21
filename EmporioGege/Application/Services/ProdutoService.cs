@@ -14,7 +14,8 @@ namespace EmporioGege.Application.Services
                 p.unidade_medida AS UnidadeMedida, p.quantidade_por_caixa AS QuantidadePorCaixa,
                 p.data_validade AS DataValidade, p.ativo AS Ativo,
                 (SELECT valor FROM precos_produto WHERE tenant_id = p.tenant_id AND produto_id = p.id AND tipo_preco = 'CAIXA') AS PrecoCaixa,
-                (SELECT valor FROM precos_produto WHERE tenant_id = p.tenant_id AND produto_id = p.id AND tipo_preco = 'ATACADO') AS PrecoAtacado
+                (SELECT valor FROM precos_produto WHERE tenant_id = p.tenant_id AND produto_id = p.id AND tipo_preco = 'ATACADO') AS PrecoAtacado,
+                p.codigo_ncm AS CodigoNcm, p.cfop AS Cfop
             FROM produtos p
             """;
 
@@ -52,13 +53,14 @@ namespace EmporioGege.Application.Services
             {
                 await connection.ExecuteAsync(new CommandDefinition(
                     """
-                    INSERT INTO produtos (id, tenant_id, nome, codigo_barras, custo_medio, preco_venda_base, estoque_atual, estoque_minimo, unidade_medida, quantidade_por_caixa, data_validade, ativo, created_at)
-                    VALUES (@Id, @TenantId, @Nome, @CodigoBarras, @CustoMedio, @PrecoVendaBase, @EstoqueAtual, @EstoqueMinimo, @UnidadeMedida, @QuantidadePorCaixa, @DataValidade, true, now())
+                    INSERT INTO produtos (id, tenant_id, nome, codigo_barras, custo_medio, preco_venda_base, estoque_atual, estoque_minimo, unidade_medida, quantidade_por_caixa, data_validade, ativo, codigo_ncm, cfop, created_at)
+                    VALUES (@Id, @TenantId, @Nome, @CodigoBarras, @CustoMedio, @PrecoVendaBase, @EstoqueAtual, @EstoqueMinimo, @UnidadeMedida, @QuantidadePorCaixa, @DataValidade, true, @CodigoNcm, @Cfop, now())
                     """,
                     new
                     {
                         Id = produtoId, TenantId = tenantId, dto.Nome, dto.CodigoBarras, dto.CustoMedio, dto.PrecoVendaBase,
-                        dto.EstoqueAtual, dto.EstoqueMinimo, dto.UnidadeMedida, dto.QuantidadePorCaixa, dto.DataValidade
+                        dto.EstoqueAtual, dto.EstoqueMinimo, dto.UnidadeMedida, dto.QuantidadePorCaixa, dto.DataValidade,
+                        dto.CodigoNcm, dto.Cfop
                     },
                     transaction, cancellationToken: ct));
             }
@@ -69,13 +71,15 @@ namespace EmporioGege.Application.Services
                     UPDATE produtos SET
                         nome = @Nome, codigo_barras = @CodigoBarras, custo_medio = @CustoMedio, preco_venda_base = @PrecoVendaBase,
                         estoque_atual = @EstoqueAtual, estoque_minimo = @EstoqueMinimo, unidade_medida = @UnidadeMedida,
-                        quantidade_por_caixa = @QuantidadePorCaixa, data_validade = @DataValidade
+                        quantidade_por_caixa = @QuantidadePorCaixa, data_validade = @DataValidade,
+                        codigo_ncm = @CodigoNcm, cfop = @Cfop
                     WHERE id = @Id AND tenant_id = @TenantId
                     """,
                     new
                     {
                         Id = produtoId, TenantId = tenantId, dto.Nome, dto.CodigoBarras, dto.CustoMedio, dto.PrecoVendaBase,
-                        dto.EstoqueAtual, dto.EstoqueMinimo, dto.UnidadeMedida, dto.QuantidadePorCaixa, dto.DataValidade
+                        dto.EstoqueAtual, dto.EstoqueMinimo, dto.UnidadeMedida, dto.QuantidadePorCaixa, dto.DataValidade,
+                        dto.CodigoNcm, dto.Cfop
                     },
                     transaction, cancellationToken: ct));
 

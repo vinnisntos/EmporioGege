@@ -8,7 +8,7 @@ using EmporioGege.Core.Interfaces;
 namespace EmporioGege.Pages.SuperAdmin.Adegas
 {
     [Authorize(Policy = "SuperAdminOnly")]
-    public class EditarModel(ITenantService tenantService) : PageModel
+    public class EditarModel(ITenantService tenantService, IFaturamentoService faturamentoService) : PageModel
     {
         [BindProperty(SupportsGet = true)]
         public Guid? Id { get; set; }
@@ -57,8 +57,35 @@ namespace EmporioGege.Pages.SuperAdmin.Adegas
         [Required(ErrorMessage = "Informe a data de expiração da licença.")]
         public DateTime DataExpiracao { get; set; } = DateTime.UtcNow.AddYears(1);
 
+        // Assinatura/cobrança (Asaas) - SEM [Required]/[Range] de propósito, e TODAS
+        // declaradas nullable (string?) mesmo com um valor padrão sensato em mente: essa
+        // página tem outro handler (OnPostAsync, acima) com ModelState.IsValid genérico, que
+        // valida TODAS as propriedades bound da classe a cada POST, não só as do form/handler
+        // chamado (mesma classe de bug já corrigida em Caixa/Turno - ver README.txt, bug #15).
+        // Armadilha específica encontrada aqui: com Nullable Reference Types habilitado no
+        // projeto, o ASP.NET Core torna qualquer "string" (não "string?") IMPLICITAMENTE
+        // obrigatória pra validação de model, mesmo sem [Required] explícito - declarar
+        // TipoCobranca como "string" (não nullable) fazia o formulário "Salvar" (que não
+        // envia esse campo) falhar ModelState.IsValid silenciosamente, sem nenhuma mensagem
+        // de erro na tela (o "Salvar" não seta MensagemErro no ramo de ModelState inválido).
+        // Confirmado ao vivo: o CNPJ nunca era persistido, apesar da tela mostrar o valor
+        // digitado (Razor re-exibe os valores postados mesmo quando Page() é retornado).
+        [BindProperty]
+        public string? Plano { get; set; }
+
+        [BindProperty]
+        public decimal ValorMensalidade { get; set; }
+
+        [BindProperty]
+        public string? TipoCobranca { get; set; }
+
+        public AssinaturaTenantDto? Assinatura { get; set; }
+
         [TempData]
         public string? MensagemErro { get; set; }
+
+        [TempData]
+        public string? MensagemSucesso { get; set; }
 
         public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         {
@@ -83,6 +110,8 @@ namespace EmporioGege.Pages.SuperAdmin.Adegas
             EmailDono = loja.EmailDono;
             StatusLicenca = loja.StatusLicenca;
             DataExpiracao = loja.DataExpiracao;
+
+            Assinatura = await faturamentoService.ObterAsync(Id.Value, ct);
             return Page();
         }
 
@@ -104,6 +133,25 @@ namespace EmporioGege.Pages.SuperAdmin.Adegas
                 MensagemErro = ex.Message;
                 return Page();
             }
+        }
+
+        public async Task<IActionResult> OnPostCriarAssinaturaAsync(CancellationToken ct)
+        {
+            if (Id is null)
+                return RedirectToPage("Index");
+
+            if (string.IsNullOrWhiteSpace(Plano) || ValorMensalidade <= 0)
+            {
+                MensagemErro = "Selecione o plano e informe um valor mensal maior que zero.";
+                return RedirectToPage(new { Id });
+            }
+
+            var resultado = await faturamentoService.CriarAssinaturaAsync(Id.Value, Plano, ValorMensalidade, TipoCobranca ?? "UNDEFINED", ct);
+
+            MensagemErro = resultado.Sucesso ? null : resultado.MensagemErro;
+            MensagemSucesso = resultado.Sucesso ? "Assinatura criada no Asaas com sucesso." : null;
+
+            return RedirectToPage(new { Id });
         }
     }
 }

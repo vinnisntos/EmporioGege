@@ -61,12 +61,14 @@ lojista.
   vendedor. Testado ao vivo: a 6ª tentativa foi bloqueada mesmo
   usando a senha CORRETA, confirmando que o bloqueio funciona.
 
-Ainda não corrigido (fora do escopo desta rodada de correções, ver
-seção 5): pacote de segurança do token JWT (Microsoft.IdentityModel.
-JsonWebTokens 7.0.3) tem uma vulnerabilidade moderada conhecida
-(aparece como warning em todo build) — vale avaliar upgrade antes de
-produção. Proteção contra força bruta no LOGIN em si (diferente da
-senha de supervisor, já corrigida) também continua pendente.
+Ainda não corrigido: pacote de segurança do token JWT (Microsoft.
+IdentityModel.JsonWebTokens 7.0.3) tem uma vulnerabilidade moderada
+conhecida (aparece como warning em todo build) — vale avaliar upgrade
+antes de produção (ver seção 8).
+
+ATUALIZAÇÃO 2026-07-21: proteção contra força bruta no LOGIN em si
+(diferente da senha de supervisor, corrigida em 2026-07-20) também já
+foi corrigida — ver seção 5 abaixo.
 
 
 1. INFRAESTRUTURA DE E-MAIL (SMTP PRÓPRIO) — BLOQUEADOR
@@ -86,43 +88,63 @@ O que fazer: configurar um provedor SMTP próprio no painel do Supabase
 em produção para clientes reais.
 
 
-2. ONBOARDING SELF-SERVICE E COBRANÇA — BLOQUEADOR PRA VENDA POR ASSINATURA
+2. ONBOARDING SELF-SERVICE E COBRANÇA — PARCIALMENTE RESOLVIDO EM 2026-07-21
 ================================================================
 Este é o item que mais importa se a intenção é "vender por
 assinatura" no sentido literal (cliente se cadastra, escolhe um plano,
-paga, e começa a usar sozinho, sem contato comercial manual). Hoje
-NADA disso existe:
-  - Cadastro de loja nova só pelo superadmin (SuperAdmin/Adegas), que
-    também precisa criar o primeiro administrador da loja "entrando"
-    nela manualmente (Admin/Funcionarios).
-  - Não existe fluxo de autocadastro (o dono de uma adega se
-    cadastrar sozinho, sem depender de alguém com acesso de
-    superadmin).
-  - Não existe escolha de plano nem tela de preços.
-  - Não existe cobrança/assinatura automatizada — o campo
-    status_licenca e a data de expiração são editados manualmente
-    pelo superadmin, sem nenhuma integração com um meio de pagamento
-    (Stripe, Pagar.me, Iugu, Asaas etc.) por trás. Não há geração de
-    fatura, cobrança recorrente, nem suspensão automática por
-    inadimplência.
+paga, e começa a usar sozinho, sem contato comercial manual).
+
+O que JÁ FOI FEITO (escopo combinado com o usuário: só automatizar a
+cobrança de lojas já cadastradas, não o cadastro self-service
+completo): o superadmin cadastra a loja manualmente como sempre
+(SuperAdmin/Adegas), mas agora tem uma seção "Assinatura/Cobrança"
+nessa mesma tela onde escolhe o plano (Start/Pro/Enterprise, com
+valor sugerido mas editável — preço final é negociado por loja) e a
+forma de pagamento (Pix/Boleto/Cartão/cliente escolhe); ao confirmar,
+o sistema cria o cliente e a assinatura de verdade no Asaas. Dali em
+diante, status_licenca é atualizado AUTOMATICAMENTE por um webhook do
+Asaas (pagamento confirmado = ativo com nova data de expiração,
+vencido = suspenso, assinatura cancelada = cancelado) — não precisa
+mais editar esse campo manualmente. Testado de ponta a ponta contra o
+ambiente sandbox real do Asaas (cliente e assinatura de teste criados
+de verdade, os três eventos de webhook testados e confirmados).
+
+O que AINDA NÃO existe (self-service completo):
+  - Fluxo de autocadastro (o dono de uma adega se cadastrar sozinho,
+    sem depender de alguém com acesso de superadmin).
+  - Tela pública de preços/escolha de plano antes do cadastro.
+  - Cobrança automática NA CRIAÇÃO da loja (hoje o superadmin ainda
+    aciona "criar assinatura" manualmente depois de cadastrar).
+  - Taxa de implantação/setup (cobrança única) — mencionada pelo
+    usuário como parte do modelo comercial, ainda não implementada.
 
 Se a venda for feita via contato comercial direto (você cadastrando
-cada cliente manualmente, cobrando fora do sistema), isso não bloqueia
-o lançamento — é basicamente o modelo atual. Se a ideia for venda
-self-service de verdade (o cliente se cadastra e paga sozinho, sem
-você no meio), esse fluxo completo (cadastro + planos + gateway de
-pagamento + automação de suspensão/reativação por status de pagamento)
-ainda precisa ser construído do zero.
+cada cliente manualmente), o que já foi feito é suficiente — a
+cobrança recorrente já roda sozinha depois do cadastro. Se a ideia for
+venda self-service de verdade (o cliente se cadastra e paga sozinho,
+sem você no meio), ainda falta construir o cadastro público + escolha
+de plano antes de qualquer contato humano.
 
 
-3. NFC-E REAL (EMISSÃO FISCAL)
+3. NFC-E REAL (EMISSÃO FISCAL) — EM ANDAMENTO, PAUSADO EM 2026-07-21
 ================================================================
-Hoje existe só um campo interno "emitir_nota_fiscal" (uma marcação),
-sem emissão de nota fiscal de verdade. Falta escolher um provedor
-(Focus NFe, eNotas, PlugNotas são os candidatos considerados) e
-integrar a emissão real. Sem isso, o sistema não substitui uma
-solução com nota fiscal eletrônica de verdade — importante dependendo
-do porte/regime tributário do cliente.
+Provedor decidido: Focus NFe (só emissão de NFC-e). Já implementado:
+tela "Configuração Fiscal" (Admin) pra loja preencher dados cadastrais
+fiscais (razão social, regime tributário, endereço, IE) e enviar o
+certificado digital A1 (que vai direto pro Focus NFe — nunca fica
+guardado neste sistema, nem o arquivo nem a senha), e o cliente HTTP
+que chama a API deles pra registrar a empresa. Também adicionados
+campos opcionais de NCM/CFOP no cadastro de produto (Admin/Estoque),
+exigidos pela Focus NFe item a item na nota — ainda em branco pros
+produtos existentes, precisa de alguém com conhecimento tributário
+preencher antes da emissão funcionar de verdade.
+
+Pausado por decisão do usuário (queria focar no billing primeiro,
+"por causa dos custos da aplicação"): falta o TOKEN DE CONTA correto
+da Focus NFe (o token testado era do Asaas, colado por engano) pra
+validar o registro de empresa e a emissão de nota de ponta a ponta.
+A CHAMADA DE EMISSÃO da nota em si (na hora de fechar uma venda)
+ainda não foi implementada — só o cadastro da empresa.
 
 
 4. INTEGRAÇÃO DE PAGAMENTO NO PDV
@@ -134,14 +156,21 @@ pagamento tivesse sido feito, mas não confirma o recebimento de
 verdade.
 
 
-5. PROTEÇÃO CONTRA FORÇA BRUTA NO LOGIN
+5. PROTEÇÃO CONTRA FORÇA BRUTA NO LOGIN — CORRIGIDO EM 2026-07-21
 ================================================================
-Não existe limite de tentativas de login. Um ataque de força bruta
-contra qualquer conta (inclusive superadmin) pode ser tentado sem
-bloqueio. O mesmo problema existe na senha de supervisor usada dentro
-do Caixa/Comandas (achado na auditoria de 2026-07-20, ver seção 0).
-Recomendado antes de expor o sistema publicamente na internet para
-clientes reais.
+Não existia limite de tentativas de login — um ataque de força bruta
+contra qualquer conta (inclusive superadmin) podia ser tentado sem
+bloqueio. Corrigido com dois limites combinados (as duas regras
+precisam permitir): 8 tentativas a cada 5 minutos por e-mail tentado
+(impede força bruta contra UMA conta, não importa de quantos IPs) e
+20 tentativas a cada 5 minutos por IP de origem (impede um atacante
+testando várias contas rapidamente da mesma origem). Mensagem de erro
+idêntica à de senha errada, pra não vazar se o bloqueio é por força
+bruta ou por credencial inválida. Testado ao vivo via requisições
+HTTP diretas com sessão/token novos: mesmo com a senha CORRETA, a
+9ª tentativa contra a mesma conta em 5 minutos continua bloqueada.
+O mesmo problema na senha de supervisor do Caixa/Comandas já tinha
+sido corrigido na auditoria de 2026-07-20 (ver seção 0).
 
 
 6. TESTES AUTOMATIZADOS
@@ -172,17 +201,27 @@ mas uma revisão de segurança formal antes do lançamento comercial
 lidar com dados financeiros e de clientes de terceiros.
 
 
+DECISÕES DE PROVEDOR JÁ TOMADAS (2026-07-21): NFC-e via Focus NFe
+(só emissão de NFC-e, nenhum outro serviço deles) — integração
+iniciada, pausada até ter o token de conta correto. Cobrança/
+assinatura via Asaas (conta já criada, ambiente sandbox) — automação
+de cobrança de loja já cadastrada IMPLEMENTADA E TESTADA (seção 2).
+
 RESUMO — ORDEM DE PRIORIDADE SUGERIDA
 ================================================================
 1. SMTP próprio (bloqueador imediato, trava cadastro de funcionário)
-2. Proteção contra força bruta no LOGIN (a da senha de supervisor já
-   foi corrigida na auditoria de 2026-07-20, seção 0)
-3. NFC-e real (se o cliente-alvo exigir nota fiscal)
-4. Integração de pagamento real no PDV
-5. Onboarding self-service + cobrança (seção 2) — só se a venda for
-   self-service de verdade; é o maior esforço da lista
-6. Testes automatizados
-7. Tela de configuração de impressora
-8. Revisão de segurança formal (upgrade do pacote JWT vulnerável,
-   seção 0, e um pentest/auditoria externa antes do lançamento
+2. Retomar NFC-e via Focus NFe (seção 3) — falta o token de conta
+   correto + implementar a chamada de emissão na hora da venda
+3. Integração de pagamento real no PDV
+4. Onboarding self-service completo (seção 2) — só se a venda for
+   self-service de verdade (cadastro público sem superadmin); a
+   automação de cobrança de loja já cadastrada já está pronta
+5. Testes automatizados
+6. Tela de configuração de impressora
+7. Revisão de segurança formal (upgrade do pacote JWT vulnerável,
+   seção 8, e um pentest/auditoria externa antes do lançamento
    comercial)
+
+Já corrigido: proteção contra força bruta no login (seção 5) e na
+senha de supervisor (seção 0, auditoria de 2026-07-20); automação de
+cobrança/assinatura via Asaas pra lojas já cadastradas (seção 2).

@@ -4,12 +4,16 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 using Supabase;
 using EmporioGege.Application.Services;
 using EmporioGege.Core.Enums;
 using EmporioGege.Core.Interfaces;
+using EmporioGege.Core.Security;
 using EmporioGege.Infrastructure.Auth;
 using EmporioGege.Infrastructure.Data;
+using EmporioGege.Infrastructure.Faturamento;
+using EmporioGege.Infrastructure.Fiscal;
 using EmporioGege.Infrastructure.Impressao;
 using EmporioGege.Infrastructure.Tenancy;
 using EmporioGege.Infrastructure.Webhooks;
@@ -41,6 +45,7 @@ builder.Services.AddScoped<IFuncionarioService, FuncionarioService>();
 builder.Services.AddScoped<IClienteService, ClienteService>();
 builder.Services.AddScoped<IComandaService, ComandaService>();
 builder.Services.AddSingleton<SupervisorTentativaLimiter>();
+builder.Services.AddSingleton<LoginTentativaLimiter>();
 builder.Services.AddScoped<ISupervisorAutorizacaoService, SupervisorAutorizacaoService>();
 builder.Services.AddScoped<ITenantService, TenantService>();
 
@@ -49,6 +54,41 @@ builder.Services.AddScoped<ITenantService, TenantService>();
 // PC de caixa tem a sua própria impressora pareada, muitas vezes numa porta diferente.
 builder.Services.Configure<ImpressoraOptions>(builder.Configuration.GetSection("Impressora"));
 builder.Services.AddScoped<IImpressoraReciboService, SerialPortImpressoraReciboService>();
+
+// Cadastro fiscal (NFC-e via Focus NFe): token da EMPRESA que a Focus NFe devolve fica
+// cifrado em repouso (tenants.focus_nfe_token_*_cifrado) - o certificado digital em si
+// NUNCA fica com a gente, só passa em memória até a chamada de cadastro (ver
+// Application/Services/ConfiguracaoFiscalService.cs).
+builder.Services.Configure<CriptografiaOptions>(builder.Configuration.GetSection("Fiscal"));
+builder.Services.AddSingleton<CriptografiaSimetrica>();
+builder.Services.Configure<FocusNfeOptions>(builder.Configuration.GetSection("FocusNFe"));
+builder.Services.AddHttpClient<IFocusNfeClient, FocusNfeClient>((sp, client) =>
+{
+    var focusNfeOpcoes = sp.GetRequiredService<IOptions<FocusNfeOptions>>().Value;
+    client.BaseAddress = new Uri(focusNfeOpcoes.Ambiente == "producao"
+        ? "https://api.focusnfe.com.br/"
+        : "https://homologacao.focusnfe.com.br/");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddScoped<IConfiguracaoFiscalService, ConfiguracaoFiscalService>();
+
+// Assinatura/cobrança da própria loja pra usar o PendurAi (Asaas) - escopo combinado com o
+// usuário 2026-07-21: só automatiza a cobrança de lojas já cadastradas manualmente pelo
+// superadmin, não é o cadastro self-service completo (ver Application/Services/
+// FaturamentoService.cs e a seção "Assinatura/Cobrança" em SuperAdmin/Adegas/Editar).
+builder.Services.Configure<AsaasOptions>(builder.Configuration.GetSection("Asaas"));
+builder.Services.AddHttpClient<IAsaasClient, AsaasClient>((sp, client) =>
+{
+    var asaasOpcoes = sp.GetRequiredService<IOptions<AsaasOptions>>().Value;
+    client.BaseAddress = new Uri(asaasOpcoes.Ambiente == "producao"
+        ? "https://api.asaas.com/v3/"
+        : "https://api-sandbox.asaas.com/v3/");
+    client.DefaultRequestHeaders.Add("access_token", asaasOpcoes.Token);
+    client.DefaultRequestHeaders.Add("User-Agent", "PendurAi"); // Asaas exige User-Agent - HttpClient não define um por padrão
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddScoped<IFaturamentoService, FaturamentoService>();
+builder.Services.AddScoped<IAsaasWebhookService, AsaasWebhookService>();
 
 // 1.2 Permite validar o antiforgery token via header em chamadas AJAX/fetch (PDV),
 // já que essas requisições não enviam o campo de formulário __RequestVerificationToken.
@@ -217,5 +257,40 @@ app.MapPost("/webhooks/zedelivery/{token}", async (
     return await next(context);
 })
 .WithName("ZeDeliveryWebhook");
+
+// 7. Webhook do Asaas — cobrança/assinatura da PRÓPRIA loja pra usar o PendurAi (não é o
+// PDV, que é cobrança do cliente final). Endpoint único/global (não por tenant, diferente
+// do Zé Delivery) porque há uma só conta Asaas gerenciando a assinatura de todas as lojas;
+// autenticado por token fixo no header "asaas-access-token" (configurado no cadastro do
+// webhook no painel/API do Asaas, não é HMAC - ver Core/Security/TokenFixoValidator).
+app.MapPost("/webhooks/asaas", async (
+    HttpRequest request,
+    IOptions<AsaasOptions> asaasOpcoes,
+    IAsaasWebhookService webhookService,
+    ILogger<Program> logger,
+    CancellationToken ct) =>
+{
+    var tokenRecebido = request.Headers["asaas-access-token"].FirstOrDefault();
+    if (!TokenFixoValidator.IsValid(tokenRecebido, asaasOpcoes.Value.WebhookToken))
+        return Results.Unauthorized();
+
+    try
+    {
+        using var leitor = new StreamReader(request.Body);
+        var corpo = await leitor.ReadToEndAsync(ct);
+        await webhookService.ProcessarAsync(corpo, ct);
+        return Results.Ok();
+    }
+    catch (Exception ex)
+    {
+        // Nunca deixar uma exceção não tratada vazar stack trace pra fora - devolver 500 (em
+        // vez de engolir o erro) faz a Asaas reentregar o evento depois, já que aqui não
+        // existe fila durável própria (ver AsaasWebhookService: aplicar o mesmo status
+        // duas vezes é inofensivo, então isso é seguro).
+        logger.LogError(ex, "Erro inesperado no webhook do Asaas.");
+        return Results.StatusCode(StatusCodes.Status500InternalServerError);
+    }
+})
+.WithName("AsaasWebhook");
 
 app.Run();

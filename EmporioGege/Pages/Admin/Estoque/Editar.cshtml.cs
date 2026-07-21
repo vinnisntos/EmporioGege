@@ -56,6 +56,15 @@ namespace EmporioGege.Pages.Admin.Estoque
         [Range(0, double.MaxValue, ErrorMessage = "Preço de atacado não pode ser negativo.")]
         public decimal? PrecoAtacado { get; set; }
 
+        // Opcionais de propósito: classificação fiscal real (varia por produto), exigida pela
+        // Focus NFe na emissão de NFC-e, mas não algo que a aplicação possa preencher sozinha -
+        // fica em branco até o dono da loja/contador preencher (ver README.txt, migration 0011).
+        [BindProperty]
+        public string? CodigoNcm { get; set; }
+
+        [BindProperty]
+        public string? Cfop { get; set; }
+
         [TempData]
         public string? MensagemErro { get; set; }
 
@@ -82,6 +91,8 @@ namespace EmporioGege.Pages.Admin.Estoque
             DataValidade = produto.DataValidade;
             PrecoCaixa = produto.PrecoCaixa;
             PrecoAtacado = produto.PrecoAtacado;
+            CodigoNcm = produto.CodigoNcm;
+            Cfop = produto.Cfop;
 
             return Page();
         }
@@ -93,7 +104,7 @@ namespace EmporioGege.Pages.Admin.Estoque
 
             var dto = new SalvarProdutoDto(
                 Id, Nome, CodigoBarras, CustoMedio, PrecoVendaBase, EstoqueAtual, EstoqueMinimo,
-                UnidadeMedida, QuantidadePorCaixa, DataValidade, PrecoCaixa, PrecoAtacado);
+                UnidadeMedida, QuantidadePorCaixa, DataValidade, PrecoCaixa, PrecoAtacado, CodigoNcm, Cfop);
 
             await produtoService.SalvarAsync(dto, ct);
 

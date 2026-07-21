@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using EmporioGege.Core.Interfaces;
+using EmporioGege.Infrastructure.Auth;
 using EmporioGege.Models;
 
 namespace EmporioGege.Pages.Auth
@@ -13,11 +14,13 @@ namespace EmporioGege.Pages.Auth
     {
         private readonly Supabase.Client _supabase;
         private readonly ITenantService _tenantService;
+        private readonly LoginTentativaLimiter _tentativaLimiter;
 
-        public LoginModel(Supabase.Client supabase, ITenantService tenantService)
+        public LoginModel(Supabase.Client supabase, ITenantService tenantService, LoginTentativaLimiter tentativaLimiter)
         {
             _supabase = supabase;
             _tenantService = tenantService;
+            _tentativaLimiter = tentativaLimiter;
         }
 
         [BindProperty]
@@ -48,6 +51,15 @@ namespace EmporioGege.Pages.Auth
         {
             if (!ModelState.IsValid)
                 return Page();
+
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "desconhecido";
+            if (!_tentativaLimiter.PodeTentar(Email, ip))
+            {
+                // Mensagem idêntica à de credencial inválida - não vazar se o bloqueio é por
+                // força bruta ou por senha errada (evita confirmar a existência da conta).
+                MensagemErro = "Usuário ou senha inválidos.";
+                return Page();
+            }
 
             try
             {
