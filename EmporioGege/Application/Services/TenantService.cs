@@ -93,5 +93,21 @@ namespace EmporioGege.Application.Services
             if (linhasAfetadas == 0)
                 throw new InvalidOperationException($"Loja {id} não encontrada.");
         }
+
+        // Visão "God Mode" do superadmin: contagem/soma de TODOS os tenants, de propósito sem
+        // filtro de tenant_id (mesma exceção documentada na interface).
+        public async Task<int> ContarUsuariosTotalAsync(CancellationToken ct = default)
+        {
+            await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+            return await connection.QuerySingleAsync<int>(new CommandDefinition(
+                "SELECT COUNT(*)::int FROM profiles", cancellationToken: ct));
+        }
+
+        public async Task<decimal> ObterFaturamentoGlobalAsync(CancellationToken ct = default)
+        {
+            await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
+            return await connection.QuerySingleAsync<decimal>(new CommandDefinition(
+                "SELECT COALESCE(SUM(total_venda), 0) FROM vendas WHERE status = 'FECHADA'", cancellationToken: ct));
+        }
     }
 }

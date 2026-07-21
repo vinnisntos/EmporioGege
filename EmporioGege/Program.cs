@@ -40,6 +40,7 @@ builder.Services.AddScoped<IProdutoService, ProdutoService>();
 builder.Services.AddScoped<IFuncionarioService, FuncionarioService>();
 builder.Services.AddScoped<IClienteService, ClienteService>();
 builder.Services.AddScoped<IComandaService, ComandaService>();
+builder.Services.AddSingleton<SupervisorTentativaLimiter>();
 builder.Services.AddScoped<ISupervisorAutorizacaoService, SupervisorAutorizacaoService>();
 builder.Services.AddScoped<ITenantService, TenantService>();
 
@@ -64,20 +65,43 @@ builder.Services.AddHostedService<ZeDeliveryWebhookProcessor>();
 
 // Rate limit por token de webhook (não por IP — parceiros costumam disparar de vários IPs/CDNs).
 // Protege contra flood/DoS no endpoint público sem exigir autenticação de sessão.
-builder.Services.AddRateLimiter(options =>
+//
+// O limite por token sozinho é inútil contra um chamador anônimo: como o token vem da própria
+// URL (rota controlada por quem chama), mandar um token diferente a cada request cria uma
+// partição nova do FixedWindowRateLimiter toda vez, e o limite nunca acumula. Por isso ele é
+// combinado (CreateChained = as duas regras precisam permitir) com um limite GLOBAL do endpoint,
+// que não depende de nada que o chamador controle - nenhum volume de tokens distintos escapa dele.
+var webhookPorToken = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
 {
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.AddPolicy("webhooks", httpContext =>
+    var token = httpContext.Request.RouteValues["token"]?.ToString() ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "desconhecido";
+    return RateLimitPartition.GetFixedWindowLimiter(token, _ => new FixedWindowRateLimiterOptions
     {
-        var token = httpContext.Request.RouteValues["token"]?.ToString() ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "desconhecido";
-        return RateLimitPartition.GetFixedWindowLimiter(token, _ => new FixedWindowRateLimiterOptions
-        {
-            Window = TimeSpan.FromSeconds(10),
-            PermitLimit = 30,
-            QueueLimit = 0
-        });
+        Window = TimeSpan.FromSeconds(10),
+        PermitLimit = 30,
+        QueueLimit = 0
     });
 });
+
+var webhookGlobal = PartitionedRateLimiter.Create<HttpContext, string>(_ =>
+    RateLimitPartition.GetFixedWindowLimiter("zedelivery-global", _ => new FixedWindowRateLimiterOptions
+    {
+        // Teto agregado do endpoint inteiro - existe só pra impedir que trocar de token vire uma
+        // forma de nunca ser limitado. Testado ao vivo com 320 requests concorrentes usando tokens
+        // distintos: um teto de 300/10s deixava passar gente demais pro pool de conexão do Supabase
+        // (só 15 conexões no pooler em modo sessão), derrubando o app inteiro (500 em cascata pra
+        // TODOS os tenants, não só o webhook) antes mesmo do rate limiter barrar alguém. 60/10s
+        // ainda é bem mais que o tráfego normal de um parceiro sozinho (30/10s já é o teto por
+        // token), mas protege o pool compartilhado de verdade.
+        Window = TimeSpan.FromSeconds(10),
+        PermitLimit = 60,
+        QueueLimit = 0
+    }));
+
+// RateLimiterOptions.AddPolicy só aceita um Func<HttpContext, RateLimitPartition<TKey>> - não dá
+// pra registrar um PartitionedRateLimiter<HttpContext> já pronto (como o CreateChained abaixo) por
+// esse caminho. Por isso o limite combinado é aplicado direto no endpoint via AddEndpointFilter
+// (ver mapeamento da rota), em vez de builder.Services.AddRateLimiter/app.UseRateLimiter.
+var webhookRateLimiter = PartitionedRateLimiter.CreateChained(webhookPorToken, webhookGlobal);
 
 // 2. Ativa a Autenticação por Cookies no navegador
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -134,7 +158,6 @@ app.UseRequestLocalization(new RequestLocalizationOptions
 
 app.UseHttpsRedirection();
 app.UseRouting();
-app.UseRateLimiter();
 
 // 5. ATENÇÃO: A ordem aqui importa muito!
 app.UseAuthentication();
@@ -185,7 +208,14 @@ app.MapPost("/webhooks/zedelivery/{token}", async (
         return Results.StatusCode(StatusCodes.Status500InternalServerError);
     }
 })
-.RequireRateLimiting("webhooks")
+.AddEndpointFilter(async (context, next) =>
+{
+    using var lease = webhookRateLimiter.AttemptAcquire(context.HttpContext);
+    if (!lease.IsAcquired)
+        return Results.StatusCode(StatusCodes.Status429TooManyRequests);
+
+    return await next(context);
+})
 .WithName("ZeDeliveryWebhook");
 
 app.Run();

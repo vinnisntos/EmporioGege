@@ -270,7 +270,7 @@ namespace EmporioGege.Pages.Caixa.Comandas
             if (string.IsNullOrWhiteSpace(supervisorEmail) || string.IsNullOrWhiteSpace(supervisorSenha))
                 return false;
 
-            return await supervisorAutorizacaoService.AutorizarAsync(supervisorEmail, supervisorSenha, ct);
+            return await supervisorAutorizacaoService.AutorizarAsync(UsuarioId.ToString(), supervisorEmail, supervisorSenha, ct);
         }
 
         public record AbrirComandaRequest(string NumeroComanda);

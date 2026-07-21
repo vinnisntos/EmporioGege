@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using EmporioGege.Application.DTOs;
+using EmporioGege.Core.Common;
 using EmporioGege.Core.Interfaces;
 
 namespace EmporioGege.Pages.Admin.Vendas
@@ -21,13 +22,17 @@ namespace EmporioGege.Pages.Admin.Vendas
 
         public async Task OnGetAsync(CancellationToken ct)
         {
-            var hoje = DateOnly.FromDateTime(DateTime.UtcNow);
+            var hoje = FusoHorarioBrasil.HojeLocal();
             De ??= hoje.AddDays(-6);
             Ate ??= hoje;
 
             // [inicio, fimExclusivo) - mesma convenção de intervalo usada no DashboardService.
-            var inicio = De.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-            var fimExclusivo = Ate.Value.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            // De/Ate são datas escolhidas pelo usuário no fuso local (loja no Brasil) - convertê-las
+            // pra UTC direto (DateTimeKind.Utc) sem ajustar o offset causava um descasamento de até
+            // 3h com a exibição (que usa .ToLocalTime()): uma venda das 23h37 local (14/07) já
+            // tinha virado dia 15 em UTC, e aparecia dentro de um filtro "De 15/07".
+            var inicio = FusoHorarioBrasil.InicioDoDiaLocalEmUtc(De.Value);
+            var fimExclusivo = FusoHorarioBrasil.InicioDoDiaLocalEmUtc(Ate.Value.AddDays(1));
 
             Vendas = await vendaService.ListarAsync(inicio, fimExclusivo, ct);
             TotalPeriodo = Vendas.Sum(v => v.TotalVenda);

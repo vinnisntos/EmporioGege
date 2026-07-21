@@ -1,37 +1,36 @@
-﻿using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Authorization;
-using Supabase;
+using EmporioGege.Application.DTOs;
+using EmporioGege.Core.Interfaces;
 
 namespace EmporioGege.Pages.SuperAdmin
 {
     // Segurança máxima: Só entra quem tem a role superadmin definida na policy do Program.cs
     [Authorize(Policy = "SuperAdminOnly")]
-    public class IndexModel : PageModel
+    public class IndexModel(ITenantService tenantService, ILogger<IndexModel> logger) : PageModel
     {
-        private readonly Client _supabase;
+        public int TotalLojas { get; set; }
+        public int TotalUsuarios { get; set; }
+        public int LicencasAtivas { get; set; }
+        public decimal FaturamentoGlobal { get; set; }
+        public IReadOnlyList<TenantDto> Lojas { get; set; } = [];
 
-        public IndexModel(Client supabase)
-        {
-            _supabase = supabase;
-        }
-
-        // Propriedades mockadas para renderizar o painel inicial
-        public int TotalLojas { get; set; } = 2;
-        public int TotalUsuarios { get; set; } = 8;
-        public int LicencasAtivas { get; set; } = 2;
-        public double FaturamentoGlobal { get; set; } = 12450.00;
-
-        public async Task OnGetAsync()
+        public async Task OnGetAsync(CancellationToken ct)
         {
             try
             {
-                // Engenharia de Software: Exemplo futuro de contagem dinâmica do Supabase
-                // var response = await _supabase.From<Tenant>().Get();
-                // TotalLojas = response.Models.Count;
+                var lojas = await tenantService.ListarAsync(ct);
+                Lojas = lojas;
+                TotalLojas = lojas.Count;
+                LicencasAtivas = lojas.Count(l => l.StatusLicenca == "ativo");
+                TotalUsuarios = await tenantService.ContarUsuariosTotalAsync(ct);
+                FaturamentoGlobal = await tenantService.ObterFaturamentoGlobalAsync(ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Silencioso para não crashar a página em modo dev caso o banco esteja instável
+                // Nunca derrubar a tela do superadmin por uma falha pontual de leitura -
+                // mas logar de verdade, senão o erro passa em branco (mesmo problema do bug #9).
+                logger.LogError(ex, "Falha ao carregar o dashboard geral (God Mode) do superadmin.");
             }
         }
     }

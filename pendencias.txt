@@ -1,10 +1,72 @@
-PENDÊNCIAS PARA VENDER O PENDURAI COMO PRODUTO
+PENDÊNCIAS PARA VENDER O PENDURAI COMO PRODUTO (SaaS por assinatura)
 ================================================================
-Levantamento feito em 2026-07-16 após testar o sistema de ponta a
-ponta (cadastro de loja, PDV, turno, comandas, estoque, clientes,
-funcionários, vendas). Lista do que falta antes de oferecer o
-PendurAi para clientes reais. "Empório Gegê" é só o nome da loja de
-teste/piloto usada no desenvolvimento — não é o nome do produto.
+Levantamento original em 2026-07-16, revisado e ampliado em 2026-07-20
+após uma auditoria completa: revisão de todo o código-fonte em busca
+de bugs (com foco em vazamento de dado entre lojas) + testes reais de
+ponta a ponta em cada tela do sistema rodando localmente. "Empório
+Gegê" é só o nome da loja de teste/piloto usada no desenvolvimento —
+não é o nome do produto.
+
+RESUMO DA AUDITORIA DE 2026-07-20: nenhum vazamento de tenant_id
+encontrado (isolamento entre lojas está sólido). 8 bugs novos foram
+encontrados nesta sessão — TODOS já corrigidos e testados ao vivo
+(3 na primeira rodada, mais 5 depois a pedido do usuário). Nenhum
+deles era vazamento de dado entre lojas, mas dois afetavam
+diretamente a confiabilidade dos números financeiros mostrados ao
+lojista.
+
+
+0. BUGS ENCONTRADOS NA AUDITORIA DE 2026-07-20 (TODOS JÁ CORRIGIDOS)
+================================================================
+- Botão "Sair" (logout) não funcionava em NENHUMA tela do sistema
+  (404 sempre — ninguém conseguia deslogar pela interface, em nenhum
+  papel). Corrigido.
+- Telefone e CPF/RG apareciam invisíveis (não apenas "difíceis de
+  ler" — matematicamente da mesma cor do fundo da tabela) em 10 telas
+  diferentes (Estoque, Vendas, Clientes, Comandas, PDV, Turno,
+  Funcionários, Adegas). Corrigido.
+- Caractere solto ("}") aparecendo na tela de login. Corrigido.
+- Relatórios financeiros (Dashboard "Faturamento Hoje" e Extrato de
+  Vendas) calculavam o filtro de data em UTC mas exibiam em horário
+  local — gerava descasamento de até 3h todo dia (pior horário: 21h-
+  meia-noite, justamente pico de venda de bebidas). Reproduzido ao
+  vivo antes da correção: uma venda das 23h37 (14/07) aparecia dentro
+  de um filtro "De 15/07" porque seu horário em UTC já tinha virado o
+  dia. Corrigido convertendo a data escolhida pro fuso fixo de
+  Brasília (UTC-3, sem horário de verão) antes de montar os limites
+  da consulta. Testado ao vivo: a venda das 23h37 (14/07) não aparece
+  mais num filtro "De 15/07".
+- Rate limit do webhook Zé Delivery podia ser contornado trivialmente
+  (a partição do limitador usava só o token da URL, controlado por
+  quem chama — trocar o token a cada request evitava o limite).
+  Corrigido combinando o limite por token com um teto GLOBAL do
+  endpoint, que não depende de nada que o chamador controle. Testado
+  ao vivo com 320 requisições concorrentes usando tokens distintos:
+  antes da correção, nenhuma era barrada; depois, a maioria passou a
+  ser bloqueada antes de chegar no banco.
+- Tela "God Mode" do superadmin (primeira tela que ele vê ao logar)
+  mostrava números e lojas 100% inventados/fixos no código, em vez de
+  consultar o banco real. Corrigido — agora mostra contagem real de
+  lojas/licenças/usuários e faturamento global consultados no banco,
+  e a tabela lista as lojas de verdade. Testado ao vivo.
+- Impressão térmica bloqueava a thread da requisição de forma
+  síncrona (até 3s por venda se a impressora estivesse travada/
+  desconectada), numa thread compartilhada entre todas as lojas do
+  sistema. Corrigido rodando a impressão numa thread separada em vez
+  de travar a thread que atende o pedido.
+- Autorização de supervisor no Caixa/Comandas (senha de admin pra
+  cancelar/remover item) não tinha limite de tentativas, além do
+  login normal (que continua sem proteção — ver seção 5 abaixo).
+  Corrigido com um limite de 5 tentativas a cada 2 minutos por
+  vendedor. Testado ao vivo: a 6ª tentativa foi bloqueada mesmo
+  usando a senha CORRETA, confirmando que o bloqueio funciona.
+
+Ainda não corrigido (fora do escopo desta rodada de correções, ver
+seção 5): pacote de segurança do token JWT (Microsoft.IdentityModel.
+JsonWebTokens 7.0.3) tem uma vulnerabilidade moderada conhecida
+(aparece como warning em todo build) — vale avaliar upgrade antes de
+produção. Proteção contra força bruta no LOGIN em si (diferente da
+senha de supervisor, já corrigida) também continua pendente.
 
 
 1. INFRAESTRUTURA DE E-MAIL (SMTP PRÓPRIO) — BLOQUEADOR
@@ -24,23 +86,33 @@ O que fazer: configurar um provedor SMTP próprio no painel do Supabase
 em produção para clientes reais.
 
 
-2. ONBOARDING SELF-SERVICE E COBRANÇA
+2. ONBOARDING SELF-SERVICE E COBRANÇA — BLOQUEADOR PRA VENDA POR ASSINATURA
 ================================================================
-Hoje o cadastro de uma loja nova só pode ser feito manualmente pelo
-superadmin (SuperAdmin/Adegas), que também precisa criar o primeiro
-administrador da loja "entrando" nela. Não existe:
-  - Fluxo de autocadastro (o dono de uma adega se cadastrar sozinho,
-    sem depender de alguém com acesso de superadmin).
-  - Escolha de plano.
-  - Cobrança/assinatura automatizada — o campo status_licenca e a
-    data de expiração são editados manualmente pelo superadmin, sem
-    nenhuma integração com um meio de pagamento (Stripe ou similar)
-    por trás.
+Este é o item que mais importa se a intenção é "vender por
+assinatura" no sentido literal (cliente se cadastra, escolhe um plano,
+paga, e começa a usar sozinho, sem contato comercial manual). Hoje
+NADA disso existe:
+  - Cadastro de loja nova só pelo superadmin (SuperAdmin/Adegas), que
+    também precisa criar o primeiro administrador da loja "entrando"
+    nela manualmente (Admin/Funcionarios).
+  - Não existe fluxo de autocadastro (o dono de uma adega se
+    cadastrar sozinho, sem depender de alguém com acesso de
+    superadmin).
+  - Não existe escolha de plano nem tela de preços.
+  - Não existe cobrança/assinatura automatizada — o campo
+    status_licenca e a data de expiração são editados manualmente
+    pelo superadmin, sem nenhuma integração com um meio de pagamento
+    (Stripe, Pagar.me, Iugu, Asaas etc.) por trás. Não há geração de
+    fatura, cobrança recorrente, nem suspensão automática por
+    inadimplência.
 
 Se a venda for feita via contato comercial direto (você cadastrando
-cada cliente manualmente), isso não bloqueia o lançamento. Se a ideia
-for venda self-service (o cliente se cadastra e paga sozinho), esse
-fluxo completo ainda precisa ser construído.
+cada cliente manualmente, cobrando fora do sistema), isso não bloqueia
+o lançamento — é basicamente o modelo atual. Se a ideia for venda
+self-service de verdade (o cliente se cadastra e paga sozinho, sem
+você no meio), esse fluxo completo (cadastro + planos + gateway de
+pagamento + automação de suspensão/reativação por status de pagamento)
+ainda precisa ser construído do zero.
 
 
 3. NFC-E REAL (EMISSÃO FISCAL)
@@ -66,8 +138,10 @@ verdade.
 ================================================================
 Não existe limite de tentativas de login. Um ataque de força bruta
 contra qualquer conta (inclusive superadmin) pode ser tentado sem
-bloqueio. Recomendado antes de expor o sistema publicamente na
-internet para clientes reais.
+bloqueio. O mesmo problema existe na senha de supervisor usada dentro
+do Caixa/Comandas (achado na auditoria de 2026-07-20, ver seção 0).
+Recomendado antes de expor o sistema publicamente na internet para
+clientes reais.
 
 
 6. TESTES AUTOMATIZADOS
@@ -92,18 +166,23 @@ pra configurar a porta manualmente.
 ================================================================
 O sistema já passou por várias correções de segurança ao longo do
 desenvolvimento (RLS, XSS, vazamento de stack trace, escalação de
-privilégio), mas uma revisão de segurança formal antes do lançamento
-comercial (pentest ou auditoria externa) é recomendada, dado que o
-sistema vai lidar com dados financeiros e de clientes de terceiros.
+privilégio, e agora também bypass de rate limit do webhook — seção 0),
+mas uma revisão de segurança formal antes do lançamento comercial
+(pentest ou auditoria externa) é recomendada, dado que o sistema vai
+lidar com dados financeiros e de clientes de terceiros.
 
 
 RESUMO — ORDEM DE PRIORIDADE SUGERIDA
 ================================================================
 1. SMTP próprio (bloqueador imediato, trava cadastro de funcionário)
-2. Proteção contra força bruta (segurança básica antes de expor)
+2. Proteção contra força bruta no LOGIN (a da senha de supervisor já
+   foi corrigida na auditoria de 2026-07-20, seção 0)
 3. NFC-e real (se o cliente-alvo exigir nota fiscal)
 4. Integração de pagamento real no PDV
-5. Onboarding self-service + cobrança (só se a venda for self-service)
+5. Onboarding self-service + cobrança (seção 2) — só se a venda for
+   self-service de verdade; é o maior esforço da lista
 6. Testes automatizados
 7. Tela de configuração de impressora
-8. Revisão de segurança formal
+8. Revisão de segurança formal (upgrade do pacote JWT vulnerável,
+   seção 0, e um pentest/auditoria externa antes do lançamento
+   comercial)

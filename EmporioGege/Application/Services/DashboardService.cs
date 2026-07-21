@@ -1,5 +1,6 @@
 using Dapper;
 using EmporioGege.Application.DTOs;
+using EmporioGege.Core.Common;
 using EmporioGege.Core.Interfaces;
 
 namespace EmporioGege.Application.Services
@@ -61,7 +62,7 @@ namespace EmporioGege.Application.Services
         public async Task<IReadOnlyList<ProdutoValidadeDto>> ListarProdutosProximosValidadeAsync(int diasLimite = 30, CancellationToken ct = default)
         {
             var tenantId = tenantProvider.RequireTenantId();
-            var hoje = DateOnly.FromDateTime(DateTime.UtcNow);
+            var hoje = FusoHorarioBrasil.HojeLocal();
             var limite = hoje.AddDays(diasLimite);
 
             await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);

@@ -9,12 +9,20 @@ namespace EmporioGege.Infrastructure.Auth
     // Usa exatamente o mesmo mecanismo do login (Pages/Auth/Login.cshtml.cs): SignIn no
     // Supabase Auth + leitura do Profile via Postgrest, tudo dentro do mesmo request —
     // não é uma leitura "fora do request de login" que o cliente Supabase não suportaria.
-    public class SupervisorAutorizacaoService(Supabase.Client supabase, ITenantProvider tenantProvider) : ISupervisorAutorizacaoService
+    public class SupervisorAutorizacaoService(
+        Supabase.Client supabase, ITenantProvider tenantProvider,
+        SupervisorTentativaLimiter tentativaLimiter, ILogger<SupervisorAutorizacaoService> logger) : ISupervisorAutorizacaoService
     {
-        public async Task<bool> AutorizarAsync(string email, string senha, CancellationToken ct = default)
+        public async Task<bool> AutorizarAsync(string solicitanteId, string email, string senha, CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(senha))
                 return false;
+
+            if (!tentativaLimiter.PodeTentar(solicitanteId))
+            {
+                logger.LogWarning("Limite de tentativas de autorização de supervisor excedido para {SolicitanteId}.", solicitanteId);
+                return false;
+            }
 
             try
             {

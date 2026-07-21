@@ -13,5 +13,9 @@ namespace EmporioGege.Core.Interfaces
         Task<Guid> SalvarAsync(SalvarTenantDto dto, CancellationToken ct = default);
 
         Task AtualizarStatusLicencaAsync(Guid id, string statusLicenca, CancellationToken ct = default);
+
+        Task<int> ContarUsuariosTotalAsync(CancellationToken ct = default);
+
+        Task<decimal> ObterFaturamentoGlobalAsync(CancellationToken ct = default);
     }
 }

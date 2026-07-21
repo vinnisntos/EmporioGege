@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using EmporioGege.Application.DTOs;
+using EmporioGege.Core.Common;
 using EmporioGege.Core.Interfaces;
 
 namespace EmporioGege.Pages.Admin
@@ -22,11 +23,12 @@ namespace EmporioGege.Pages.Admin
         {
             try
             {
-                var hoje = DateTime.UtcNow.Date;
-                var inicioMes = new DateTime(hoje.Year, hoje.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+                var hojeLocal = FusoHorarioBrasil.HojeLocal();
+                var inicioHojeUtc = FusoHorarioBrasil.InicioDoDiaLocalEmUtc(hojeLocal);
+                var inicioMes = FusoHorarioBrasil.InicioDoDiaLocalEmUtc(new DateOnly(hojeLocal.Year, hojeLocal.Month, 1));
                 var proximoMes = inicioMes.AddMonths(1);
 
-                var resumoHoje = await dashboardService.ObterResumoAsync(hoje, hoje.AddDays(1), ct);
+                var resumoHoje = await dashboardService.ObterResumoAsync(inicioHojeUtc, inicioHojeUtc.AddDays(1), ct);
                 FaturamentoHoje = resumoHoje.Faturamento;
 
                 ResumoMes = await dashboardService.ObterResumoAsync(inicioMes, proximoMes, ct);
