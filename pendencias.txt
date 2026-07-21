@@ -221,36 +221,40 @@ Cada loja nova com impressora precisa de alguém com acesso técnico
 pra configurar a porta manualmente.
 
 
-8.5. HOSPEDAGEM / DEPLOY EM PRODUÇÃO — DESCOBERTO EM 2026-07-21, NENHUMA SOLUÇÃO EXISTE AINDA
+8.5. HOSPEDAGEM / DEPLOY EM PRODUÇÃO — RESOLVIDO EM 2026-07-21
 ================================================================
 Achado ao tentar resolver a configuração do webhook de produção do
-Asaas: o PendurAi hoje só roda localmente (`dotnet run`, localhost) —
-não existe Dockerfile, pipeline de CI/CD, appsettings de produção,
-nem qualquer domínio/servidor configurado no repositório. Isso é mais
-fundamental do que qualquer outro item desta lista: nenhum cliente
-consegue usar (nem pagar por) um sistema que só roda no notebook do
-desenvolvedor, e o webhook do Asaas não tem como chamar um localhost
-pela internet — ou seja, a pendência do webhook de produção (seção 2)
-depende DIRETAMENTE de resolver isso primeiro.
+Asaas: até então o PendurAi só rodava localmente (`dotnet run`,
+localhost) — sem isso, nenhum cliente consegue usar (nem pagar por)
+o sistema, e o webhook do Asaas não tem como chamar um localhost pela
+internet.
 
-DECIDIDO 2026-07-21: vai subir numa instância EC2 da AWS que o
-usuário já tem ativa, com deploy configurado por ele mesmo (fora do
-escopo do assistente — sem acesso à conta AWS). Falta ainda:
-  - Domínio/subdomínio apontando pro IP público da instância (avaliar
-    se reaproveita vinnisantos.com.br, já usado pro Resend, ou registra
-    um novo pro produto).
-  - HTTPS na frente da instância (EC2 sozinho não tem certificado —
-    precisa de Nginx+Let's Encrypt na própria instância, ou um Load
-    Balancer com ACM na frente). Obrigatório pro webhook do Asaas.
-  - Configuração das variáveis de ambiente de produção na instância
-    (ASPNETCORE_ENVIRONMENT=Production + os mesmos segredos hoje só
-    no user-secrets LOCAL do assistente: ConnectionStrings__
-    SupabasePostgres, Asaas__Token, Asaas__Ambiente, Asaas__
-    WebhookToken, Fiscal__ChaveCriptografia — user-secrets é só pra
-    ambiente de desenvolvimento local, não chega na instância sozinho).
-  - Depois disso: registrar o webhook no painel de PRODUÇÃO do Asaas
-    (URL pública + gerar um token lá) e setar esse token como
-    Asaas__WebhookToken na instância.
+RESOLVIDO: subiu numa instância EC2 da AWS já ativa, deploy
+configurado pelo próprio usuário, publicado em
+https://pendurai.vinnisantos.com.br. Verificado externamente (fora
+do código, via HTTP/TLS diretos):
+  - HTTP e HTTPS respondendo 200 na página inicial (conteúdo real do
+    PendurAi confirmado, não um placeholder).
+  - Certificado TLS correto e válido: CN=pendurai.vinnisantos.com.br,
+    emitido pela Let's Encrypt, válido até 19/10/2026 (a primeira
+    tentativa tinha pego por engano o certificado de outro subdomínio
+    do mesmo servidor — corrigido emitindo um certificado dedicado).
+  - Rota `/webhooks/asaas` respondendo como esperado: 405 em GET (só
+    aceita POST) e 401 em POST sem o token correto (validação de
+    segurança ativa).
+
+Ainda falta, antes do primeiro uso real:
+  - Confirmar que as variáveis de ambiente de produção estão setadas
+    na instância (ASPNETCORE_ENVIRONMENT=Production +
+    ConnectionStrings__SupabasePostgres, Asaas__Token=producao,
+    Asaas__Ambiente=producao, Fiscal__ChaveCriptografia — os mesmos
+    valores que hoje só existem no user-secrets LOCAL do assistente).
+  - Registrar o webhook no painel de PRODUÇÃO do Asaas usando a URL
+    https://pendurai.vinnisantos.com.br/webhooks/asaas, selecionando
+    os eventos PAYMENT_CONFIRMED, PAYMENT_RECEIVED, PAYMENT_OVERDUE,
+    SUBSCRIPTION_DELETED, SUBSCRIPTION_INACTIVATED, e gerando um token
+    lá — depois setar esse valor como Asaas__WebhookToken na instância
+    (hoje ainda está com o token de sandbox).
 
 
 8. REVISÃO DE SEGURANÇA GERAL
@@ -283,10 +287,10 @@ feitos, mesmo nesta fase inicial.
 
 RESUMO — ORDEM DE PRIORIDADE SUGERIDA
 ================================================================
-1. Hospedagem/deploy em produção (seção 8.5) — BLOQUEIA literalmente
-   tudo mais nesta lista: sem isso não há webhook do Asaas funcionando
-   de verdade, nem cliente nenhum usando o sistema fora do notebook do
-   desenvolvedor. Descoberto em 2026-07-21, ainda sem decisão.
+1. Webhook de produção do Asaas (seção 2/8.5) — hospedagem já
+   resolvida (https://pendurai.vinnisantos.com.br, HTTPS válido);
+   falta só registrar o webhook no painel de produção do Asaas e
+   confirmar as variáveis de ambiente na instância.
 2. Testes automatizados (confirmado pelo usuário como prioridade,
    mesmo na fase inicial "crua")
 3. Revisão de segurança formal (confirmado pelo usuário; inclui
@@ -299,11 +303,12 @@ RESUMO — ORDEM DE PRIORIDADE SUGERIDA
 
 Pendências de custo, retomar quando houver orçamento (não bloqueiam
 o lançamento "cru" combinado com o usuário):
-5. NFC-e real via Focus NFe (seção 3) — mensalidade recorrente por
+6. NFC-e real via Focus NFe (seção 3) — mensalidade recorrente por
    loja, sem plano gratuito
-6. Integração de pagamento real no PDV (seção 4) — maquininha/Pix
+7. Integração de pagamento real no PDV (seção 4) — maquininha/Pix
 
 Já corrigido: SMTP próprio (seção 1); proteção contra força bruta no
 login (seção 5) e na senha de supervisor (seção 0, auditoria de
 2026-07-20); automação de cobrança/assinatura via Asaas pra lojas já
-cadastradas (seção 2).
+cadastradas (seção 2); hospedagem/deploy em produção (seção 8.5) —
+publicado em https://pendurai.vinnisantos.com.br com HTTPS válido.
