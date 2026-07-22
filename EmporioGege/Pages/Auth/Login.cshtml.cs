@@ -87,12 +87,14 @@ namespace EmporioGege.Pages.Auth
                 // 2.5. Bloqueia login se a licença da loja estiver suspensa/cancelada/expirada.
                 // Superadmin fica de fora: ele gerencia todas as lojas e não deve ficar preso
                 // pela licença de uma loja específica (mesmo tendo tenant_id vinculado nos dados de teste).
+                string? tenantNome = null;
                 if (resultadoPerfil.Role != "superadmin" && !string.IsNullOrEmpty(resultadoPerfil.TenantId)
                     && Guid.TryParse(resultadoPerfil.TenantId, out var tenantId))
                 {
                     var tenant = await _tenantService.ObterAsync(tenantId);
                     if (tenant != null)
                     {
+                        tenantNome = tenant.NomeFantasia;
                         MensagemErro = tenant.StatusLicenca switch
                         {
                             "suspenso" => "Acesso suspenso. Entre em contato com o suporte.",
@@ -118,7 +120,8 @@ namespace EmporioGege.Pages.Auth
                     new Claim(ClaimTypes.NameIdentifier, resultadoPerfil.Id),
                     new Claim(ClaimTypes.Name, resultadoPerfil.Nome),
                     new Claim(ClaimTypes.Role, resultadoPerfil.Role),
-                    new Claim("TenantId", resultadoPerfil.TenantId ?? "")
+                    new Claim("TenantId", resultadoPerfil.TenantId ?? ""),
+                    new Claim("TenantNome", tenantNome ?? "")
                 };
 
                 var identidade = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
