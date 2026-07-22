@@ -42,7 +42,12 @@
     }
     else
     {
-        <table class="table table-dark table-borderless align-middle mb-0">
+        <div class="mb-3">
+            <input type="text" id="busca-estoque" class="form-control" autocomplete="off"
+                   placeholder="Buscar por nome ou código de barras..." />
+        </div>
+        <p id="busca-sem-resultado" class="text-muted text-center py-4 mb-0 d-none">Nenhum produto encontrado.</p>
+        <table class="table table-dark table-borderless align-middle mb-0" id="tabela-estoque">
             <thead>
                 <tr class="text-muted small text-uppercase">
                     <th>Produto</th>
@@ -57,7 +62,7 @@
                 @foreach (var p in Model.Produtos)
                 {
                     var estoqueCritico = p.EstoqueAtual <= p.EstoqueMinimo;
-                    <tr class="@(p.Ativo ? "" : "opacity-50")">
+                    <tr class="@(p.Ativo ? "" : "opacity-50")" data-busca="@($"{p.Nome} {p.CodigoBarras}".ToLowerInvariant())">
                         <td>
                             <div class="fw-medium text-white">@p.Nome</div>
                             <div class="text-muted small">@p.UnidadeMedida @(p.QuantidadePorCaixa > 1 ? $"· Cx com {p.QuantidadePorCaixa}" : "")</div>
@@ -96,3 +101,30 @@
         </table>
     }
 </div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const input = document.getElementById('busca-estoque');
+            if (!input) return;
+
+            const linhas = Array.from(document.querySelectorAll('#tabela-estoque tbody tr'));
+            const semResultado = document.getElementById('busca-sem-resultado');
+
+            input.addEventListener('input', function () {
+                const termo = input.value.trim().toLowerCase();
+                let visiveis = 0;
+
+                linhas.forEach(function (linha) {
+                    const confere = linha.dataset.busca.includes(termo);
+                    linha.classList.toggle('d-none', !confere);
+                    if (confere) visiveis++;
+                });
+
+                semResultado.classList.toggle('d-none', visiveis > 0);
+            });
+
+            input.focus();
+        })();
+    </script>
+}
