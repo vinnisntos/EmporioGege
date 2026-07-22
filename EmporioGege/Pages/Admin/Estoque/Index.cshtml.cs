@@ -14,6 +14,9 @@ namespace EmporioGege.Pages.Admin.Estoque
         [TempData]
         public string? MensagemSucesso { get; set; }
 
+        [TempData]
+        public string? MensagemErro { get; set; }
+
         public async Task OnGetAsync(CancellationToken ct)
         {
             Produtos = await produtoService.ListarAsync(ct);

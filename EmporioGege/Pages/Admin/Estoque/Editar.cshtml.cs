@@ -68,6 +68,9 @@ namespace EmporioGege.Pages.Admin.Estoque
         [BindProperty]
         public string? Cfop { get; set; }
 
+        [BindProperty]
+        public bool PermiteBaixaManual { get; set; }
+
         [TempData]
         public string? MensagemErro { get; set; }
 
@@ -96,6 +99,7 @@ namespace EmporioGege.Pages.Admin.Estoque
             PrecoAtacado = produto.PrecoAtacado;
             CodigoNcm = produto.CodigoNcm;
             Cfop = produto.Cfop;
+            PermiteBaixaManual = produto.PermiteBaixaManual;
 
             return Page();
         }
@@ -107,7 +111,7 @@ namespace EmporioGege.Pages.Admin.Estoque
 
             var dto = new SalvarProdutoDto(
                 Id, Nome, CodigoBarras, CustoMedio, PrecoVendaBase, EstoqueAtual, EstoqueMinimo,
-                UnidadeMedida, QuantidadePorCaixa, DataValidade, PrecoCaixa, PrecoAtacado, CodigoNcm, Cfop);
+                UnidadeMedida, QuantidadePorCaixa, DataValidade, PrecoCaixa, PrecoAtacado, CodigoNcm, Cfop, PermiteBaixaManual);
 
             await produtoService.SalvarAsync(dto, UsuarioId, ct);
 

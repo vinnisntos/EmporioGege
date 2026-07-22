@@ -90,15 +90,18 @@ namespace EmporioGege.Pages.Admin.Estoque
             "ENTRADA_COMPRA" => "Entrada (Compra)",
             "SAIDA_VENDA" => "Saída (Venda)",
             "AJUSTE_MANUAL" => "Ajuste Manual",
+            "SAIDA_QUEBRA" => "Saída (Quebra)",
+            "SAIDA_DESCARTE" => "Saída (Descarte)",
+            "SAIDA_USO_INSUMO" => "Saída (Uso como Insumo)",
             _ => tipo
         };
 
-        // SAIDA_VENDA grava a quantidade vendida como valor positivo (unidades retiradas),
-        // diferente de ENTRADA_COMPRA/AJUSTE_MANUAL onde o sinal já é o delta real de estoque -
-        // sem isso, toda venda aparecia como "+X" (aumento), igual uma entrada.
+        // SAIDA_VENDA/SAIDA_QUEBRA/SAIDA_DESCARTE/SAIDA_USO_INSUMO gravam a quantidade retirada
+        // como valor positivo, diferente de ENTRADA_COMPRA/AJUSTE_MANUAL onde o sinal já é o
+        // delta real de estoque - sem isso, toda baixa aparecia como "+X" (aumento), igual uma entrada.
         internal static string FormatarQuantidade(string tipo, int quantidade)
         {
-            if (tipo == "SAIDA_VENDA")
+            if (tipo is "SAIDA_VENDA" or "SAIDA_QUEBRA" or "SAIDA_DESCARTE" or "SAIDA_USO_INSUMO")
                 return $"-{quantidade}";
 
             return quantidade > 0 ? $"+{quantidade}" : quantidade.ToString();

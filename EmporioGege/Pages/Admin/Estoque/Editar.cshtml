@@ -91,6 +91,14 @@
             <label asp-for="Cfop" class="form-label small text-muted">CFOP</label>
             <input asp-for="Cfop" class="form-control" placeholder="Ex.: 5102" />
         </div>
+
+        <div class="col-12"><hr class="border-secondary opacity-25" /></div>
+
+        <div class="col-12 form-check">
+            <input asp-for="PermiteBaixaManual" class="form-check-input" />
+            <label asp-for="PermiteBaixaManual" class="form-check-label">Permite baixa manual de estoque (uso como insumo, quebra ou descarte)</label>
+            <div class="form-text">Habilite só para produtos usados como insumo, ex. destilados para drinks — não faz sentido para itens como doces/balas, que nunca passam por essa operação.</div>
+        </div>
     </div>
 
     <div class="d-flex gap-2 mt-4">

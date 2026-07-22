@@ -60,7 +60,7 @@
                     var badgeClass = m.TipoMovimentacao switch
                     {
                         "ENTRADA_COMPRA" => "bg-success",
-                        "SAIDA_VENDA" => "bg-danger",
+                        "SAIDA_VENDA" or "SAIDA_QUEBRA" or "SAIDA_DESCARTE" or "SAIDA_USO_INSUMO" => "bg-danger",
                         _ => "bg-warning text-dark"
                     };
                     var tipoLabel = m.TipoMovimentacao switch
@@ -68,6 +68,9 @@
                         "ENTRADA_COMPRA" => "Entrada (Compra)",
                         "SAIDA_VENDA" => "Saída (Venda)",
                         "AJUSTE_MANUAL" => "Ajuste Manual",
+                        "SAIDA_QUEBRA" => "Saída (Quebra)",
+                        "SAIDA_DESCARTE" => "Saída (Descarte)",
+                        "SAIDA_USO_INSUMO" => "Saída (Uso como Insumo)",
                         _ => m.TipoMovimentacao
                     };
                     var quantidadeExibida = EmporioGege.Pages.Admin.Estoque.HistoricoModel.FormatarQuantidade(m.TipoMovimentacao, m.Quantidade);

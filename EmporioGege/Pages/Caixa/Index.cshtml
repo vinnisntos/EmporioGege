@@ -107,6 +107,15 @@
             <option value="FIADO">Fiado (PendurAi)</option>
         </select>
 
+        <div id="bloco-pagamento-dinheiro" class="mb-3" style="display:none;">
+            <label class="form-label small text-muted">Valor recebido</label>
+            <input type="number" id="valor-recebido" class="form-control" step="0.01" min="0" placeholder="0,00" />
+            <div class="d-flex justify-content-between mt-2">
+                <span class="text-muted small">Troco</span>
+                <span id="troco-valor" class="fw-semibold">R$ 0,00</span>
+            </div>
+        </div>
+
         <div id="bloco-cliente-fiado" class="mb-3" style="display:none;">
             <label class="form-label small text-muted">Cliente</label>
             <select id="cliente-fiado" class="form-select">
@@ -164,14 +173,39 @@
     const metodoPagamentoSelect = document.getElementById('metodo-pagamento');
     const blocoClienteFiado = document.getElementById('bloco-cliente-fiado');
     const clienteFiadoSelect = document.getElementById('cliente-fiado');
+    const blocoPagamentoDinheiro = document.getElementById('bloco-pagamento-dinheiro');
+    const valorRecebidoInput = document.getElementById('valor-recebido');
+    const trocoValorEl = document.getElementById('troco-valor');
     const antiforgeryToken = document.querySelector('input[name="__RequestVerificationToken"]').value;
 
     let emitirNotaFiscal = true;
     let sugestaoAtiva = -1;
+    let totalAtual = 0;
 
-    metodoPagamentoSelect.addEventListener('change', () => {
+    function atualizarBlocosPagamento() {
         blocoClienteFiado.style.display = metodoPagamentoSelect.value === 'FIADO' ? 'block' : 'none';
-    });
+        blocoPagamentoDinheiro.style.display = metodoPagamentoSelect.value === 'DINHEIRO' ? 'block' : 'none';
+        atualizarTroco();
+    }
+    metodoPagamentoSelect.addEventListener('change', atualizarBlocosPagamento);
+    atualizarBlocosPagamento(); // DINHEIRO já vem selecionado por padrão no <select>
+
+    // Calculadora client-side pura - só ajuda o caixa a calcular o troco na hora, nada
+    // é enviado ao servidor nem persistido (o pagamento em dinheiro continua sendo só
+    // um label, mesmo comportamento de antes).
+    function atualizarTroco() {
+        const valorRecebido = parseFloat(valorRecebidoInput.value);
+        if (isNaN(valorRecebido)) {
+            trocoValorEl.textContent = formatarMoeda(0);
+            trocoValorEl.classList.remove('text-danger', 'text-success');
+            return;
+        }
+        const troco = valorRecebido - totalAtual;
+        trocoValorEl.textContent = formatarMoeda(Math.abs(troco));
+        trocoValorEl.classList.toggle('text-danger', troco < 0);
+        trocoValorEl.classList.toggle('text-success', troco >= 0);
+    }
+    valorRecebidoInput.addEventListener('input', atualizarTroco);
 
     function formatarMoeda(valor) {
         return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -344,6 +378,8 @@
             carrinhoCorpo.appendChild(carrinhoVazioRow);
             resumoItens.textContent = '0';
             totalVendaEl.textContent = formatarMoeda(0);
+            totalAtual = 0;
+            atualizarTroco();
             return;
         }
 
@@ -387,6 +423,8 @@
 
         resumoItens.textContent = totalItens.toString();
         totalVendaEl.textContent = formatarMoeda(total);
+        totalAtual = total;
+        atualizarTroco();
     }
 
     async function finalizarVenda() {
@@ -398,6 +436,14 @@
         if (metodoPagamentoSelect.value === 'FIADO' && !clienteFiadoSelect.value) {
             mostrarToast('Selecione um cliente para venda fiado.', 'aviso');
             return;
+        }
+
+        if (metodoPagamentoSelect.value === 'DINHEIRO') {
+            const valorRecebido = parseFloat(valorRecebidoInput.value);
+            if (isNaN(valorRecebido) || valorRecebido < totalAtual) {
+                mostrarToast('Informe um valor recebido suficiente para cobrir o total da venda.', 'aviso');
+                return;
+            }
         }
 
         btnFinalizar.disabled = true;
@@ -427,6 +473,8 @@
                 }
                 carrinho.clear();
                 renderizarCarrinho();
+                valorRecebidoInput.value = '';
+                atualizarTroco();
                 buscaInput.focus();
             } else {
                 mostrarToast(resultado.mensagem ?? 'Não foi possível finalizar a venda.', 'erro');

@@ -9,6 +9,12 @@ namespace EmporioGege.Core.Interfaces
         // produto (que só fica registrado como AJUSTE_MANUAL, sem motivo/fornecedor).
         Task RegistrarEntradaAsync(Guid produtoId, int quantidade, string? justificativa, Guid usuarioId, CancellationToken ct = default);
 
+        // Baixa manual (quebra/descarte/uso como insumo) - só permitida pra produtos com
+        // produtos.permite_baixa_manual = true (restrição de negócio: nem todo produto faz
+        // sentido nessa operação, ex. balas/doces não viram insumo de drink). motivo precisa
+        // ser um de "QUEBRA", "DESCARTE" ou "USO_INSUMO".
+        Task RegistrarBaixaManualAsync(Guid produtoId, int quantidade, string motivo, string justificativa, Guid usuarioId, CancellationToken ct = default);
+
         Task<IReadOnlyList<MovimentacaoEstoqueDto>> ListarHistoricoAsync(
             DateTime inicio, DateTime fimExclusivo, Guid? produtoId, CancellationToken ct = default);
     }

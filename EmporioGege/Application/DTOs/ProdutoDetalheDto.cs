@@ -15,5 +15,6 @@ namespace EmporioGege.Application.DTOs
         decimal? PrecoCaixa,
         decimal? PrecoAtacado,
         string? CodigoNcm,
-        string? Cfop);
+        string? Cfop,
+        bool PermiteBaixaManual);
 }

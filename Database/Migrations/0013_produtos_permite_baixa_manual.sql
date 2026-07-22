@@ -1,0 +1,11 @@
+-- =============================================================================
+-- Migration 0013: permite marcar quais produtos podem sofrer baixa manual de
+-- estoque (quebra, descarte, uso como insumo). A baixa manual (Admin/Estoque/
+-- Baixa) precisa ser restrita produto a produto: faz sentido pra bebidas
+-- usadas como insumo de drinks/degustação no balcão, mas não pra itens como
+-- balas/doces, que nunca entram nessa operação. Deny-by-default (false) -
+-- o lojista habilita explicitamente cada produto elegível no cadastro.
+--
+-- Idempotente. Rodar manualmente no SQL Editor do Supabase.
+-- =============================================================================
+ALTER TABLE produtos ADD COLUMN IF NOT EXISTS permite_baixa_manual boolean NOT NULL DEFAULT false;

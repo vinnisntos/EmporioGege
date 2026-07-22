@@ -16,6 +16,9 @@
         <a asp-page="Entrada" class="btn btn-outline-light">
             <i class="bi bi-box-arrow-in-down me-1"></i> Entrada de Estoque
         </a>
+        <a asp-page="Baixa" class="btn btn-outline-light">
+            <i class="bi bi-box-arrow-up me-1"></i> Baixa Manual
+        </a>
         <a asp-page="Editar" class="btn btn-warning fw-semibold">
             <i class="bi bi-plus-circle me-1"></i> Novo Produto
         </a>
@@ -25,6 +28,11 @@
 @if (!string.IsNullOrEmpty(Model.MensagemSucesso))
 {
     <div class="alert alert-success">@Model.MensagemSucesso</div>
+}
+
+@if (!string.IsNullOrEmpty(Model.MensagemErro))
+{
+    <div class="alert alert-danger">@Model.MensagemErro</div>
 }
 
 <div class="card card-custom p-3">
