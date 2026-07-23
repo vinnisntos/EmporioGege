@@ -8,7 +8,9 @@ using EmporioGege.Core.Interfaces;
 namespace EmporioGege.Pages.Admin
 {
     [Authorize(Policy = "AdminOnly")] // Camada de defesa 2: Proteção explícita no endpoint além da pasta
-    public class IndexModel(IDashboardService dashboardService, ILogger<IndexModel> logger) : PageModel
+    public class IndexModel(
+        IDashboardService dashboardService, IFaturamentoService faturamentoService, ITenantProvider tenantProvider, ILogger<IndexModel> logger)
+        : PageModel
     {
         // Propriedades fortemente tipadas para o painel de UX
         public decimal FaturamentoHoje { get; set; }
@@ -19,6 +21,18 @@ namespace EmporioGege.Pages.Admin
 
         public DashboardResumoDto ResumoMes { get; set; } = new(0, 0, 0, null, 0);
         public IReadOnlyList<ProdutoValidadeDto> ProdutosProximosValidade { get; set; } = [];
+
+        // Widget de status de assinatura (trial/pendente/ativo) - null quando o tenant não tem
+        // nenhuma assinatura/trial registrado (não deveria acontecer no fluxo normal, mas o
+        // card só some da tela em vez de quebrar).
+        public AssinaturaTenantDto? Assinatura { get; set; }
+        public int DiasRestantesTrial { get; set; }
+
+        [TempData]
+        public string? MensagemErroAssinatura { get; set; }
+
+        [TempData]
+        public string? MensagemSucessoAssinatura { get; set; }
 
         public async Task<IActionResult> OnGetAsync(CancellationToken ct)
         {
@@ -42,6 +56,10 @@ namespace EmporioGege.Pages.Admin
                 ComandasAtivasContador = await dashboardService.ContarComandasAtivasAsync(ct);
                 ProdutosProximosValidade = await dashboardService.ListarProdutosProximosValidadeAsync(30, ct);
 
+                Assinatura = await faturamentoService.ObterAsync(tenantProvider.RequireTenantId(), ct);
+                if (Assinatura is not null)
+                    DiasRestantesTrial = (int)Math.Ceiling((Assinatura.DataExpiracao - DateTime.UtcNow).TotalDays);
+
                 return Page();
             }
             catch (Exception ex)
@@ -52,6 +70,21 @@ namespace EmporioGege.Pages.Admin
                 logger.LogError(ex, "Falha ao carregar o dashboard administrativo.");
                 return RedirectToPage("/Error");
             }
+        }
+
+        // Botão "Assinar agora" do card de trial - cria a assinatura Asaas de verdade (mesmo
+        // caminho usado pelo job de trial vencido, ver TrialExpiradoProcessor) e já mostra o
+        // link de pagamento assim que a página recarregar.
+        public async Task<IActionResult> OnPostAssinarAgoraAsync(CancellationToken ct)
+        {
+            var resultado = await faturamentoService.IniciarCobrancaTrialAsync(tenantProvider.RequireTenantId(), ct);
+
+            if (!resultado.Sucesso)
+                MensagemErroAssinatura = resultado.MensagemErro ?? "Não foi possível iniciar sua assinatura. Tente novamente em instantes.";
+            else
+                MensagemSucessoAssinatura = "Assinatura criada! Use o link de pagamento abaixo pra concluir.";
+
+            return RedirectToPage();
         }
     }
 }

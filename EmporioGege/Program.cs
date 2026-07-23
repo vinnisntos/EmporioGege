@@ -12,6 +12,7 @@ using EmporioGege.Core.Interfaces;
 using EmporioGege.Core.Security;
 using EmporioGege.Infrastructure.Auth;
 using EmporioGege.Infrastructure.Data;
+using EmporioGege.Infrastructure.Email;
 using EmporioGege.Infrastructure.Faturamento;
 using EmporioGege.Infrastructure.Fiscal;
 using EmporioGege.Infrastructure.Impressao;
@@ -98,8 +99,26 @@ builder.Services.AddHttpClient<IAsaasClient, AsaasClient>((sp, client) =>
 builder.Services.AddScoped<IFaturamentoService, FaturamentoService>();
 builder.Services.AddScoped<IAsaasWebhookService, AsaasWebhookService>();
 
-// Cadastro self-service público (Pages/CadastroLoja) - cria tenant + login administrador +
-// assinatura Asaas numa única requisição, sem nenhum superadmin envolvido.
+// E-mail transacional próprio (Resend) - boas-vindas do trial, instruções de pagamento e
+// confirmação de pagamento (ver IBillingNotificationService/BillingNotificationService).
+// Falha de envio é sempre best-effort (só loga), nunca derruba quem chamou.
+builder.Services.Configure<ResendOptions>(builder.Configuration.GetSection("Resend"));
+builder.Services.AddHttpClient<IEmailSender, ResendEmailSender>((sp, client) =>
+{
+    var resendOpcoes = sp.GetRequiredService<IOptions<ResendOptions>>().Value;
+    client.BaseAddress = new Uri("https://api.resend.com/");
+    client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", resendOpcoes.ApiKey);
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
+builder.Services.AddScoped<IBillingNotificationService, BillingNotificationService>();
+
+// Trial gratuito de 7 dias no autocadastro: converte automaticamente em cobrança Asaas quando
+// vence sem o lojista ter clicado em "Assinar agora" (ver CadastroLojaService.DiasTrial).
+builder.Services.AddHostedService<TrialExpiradoProcessor>();
+
+// Cadastro self-service público (Pages/CadastroLoja) - cria tenant + login administrador em
+// trial gratuito numa única requisição, sem nenhum superadmin envolvido. A assinatura Asaas
+// só é criada depois (ver IFaturamentoService.IniciarCobrancaTrialAsync).
 builder.Services.AddSingleton<CadastroLojaTentativaLimiter>();
 builder.Services.AddScoped<ICadastroLojaService, CadastroLojaService>();
 

@@ -11,5 +11,13 @@ namespace EmporioGege.Core.Interfaces
 
         Task<CriarAssinaturaAsaasResultado> CriarAssinaturaAsync(
             Guid tenantId, string plano, decimal valorMensalidade, string tipoCobranca, CancellationToken ct = default);
+
+        // Converte um tenant em trial (status_licenca = 'trial') pra cobrança de verdade:
+        // lê plano/valor/forma de pagamento já escolhidos no cadastro, cria a assinatura no
+        // Asaas (reaproveitando CriarAssinaturaAsync) e move o status pra 'pendente' (bloqueia
+        // login até o webhook confirmar o primeiro pagamento). Chamado tanto pelo próprio
+        // lojista ("Assinar agora" em Admin/Index) quanto automaticamente pelo
+        // TrialExpiradoProcessor quando o trial vence sem ação.
+        Task<CriarAssinaturaAsaasResultado> IniciarCobrancaTrialAsync(Guid tenantId, CancellationToken ct = default);
     }
 }

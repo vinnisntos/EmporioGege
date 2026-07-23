@@ -17,6 +17,73 @@
         </button>
     </div>
 
+    @if (!string.IsNullOrEmpty(Model.MensagemSucessoAssinatura))
+    {
+        <div class="alert alert-success py-2 px-3 mb-3" role="alert"><i class="bi bi-check-circle-fill me-2"></i>@Model.MensagemSucessoAssinatura</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.MensagemErroAssinatura))
+    {
+        <div class="alert alert-danger py-2 px-3 mb-3" role="alert"><i class="bi bi-exclamation-triangle-fill me-2"></i>@Model.MensagemErroAssinatura</div>
+    }
+
+    <!-- Card de status da assinatura/trial - único lugar onde o lojista vê isso dentro do
+         próprio sistema (antes só existia pro SuperAdmin, ver SuperAdmin/Adegas/Editar). -->
+    @if (Model.Assinatura is { } assinatura)
+    {
+        @if (assinatura.StatusLicenca == "trial")
+        {
+            var acabando = Model.DiasRestantesTrial <= 2;
+            <div class="card card-custom p-4 mb-4 d-flex flex-row justify-content-between align-items-center flex-wrap gap-3" style="border-left: 4px solid @(acabando ? "#ef4444" : "#ffc107");">
+                <div>
+                    <h6 class="text-white fw-semibold mb-1"><i class="bi bi-stopwatch me-1 @(acabando ? "text-danger" : "text-warning")"></i> Período de teste grátis</h6>
+                    <p class="text-muted small mb-0">
+                        @if (Model.DiasRestantesTrial > 0)
+                        {
+                            <text>Faltam <strong class="@(acabando ? "text-danger" : "text-warning")">@Model.DiasRestantesTrial dia(s)</strong> do seu teste grátis. Assine agora pra não perder o acesso.</text>
+                        }
+                        else
+                        {
+                            <text>Seu teste grátis termina hoje. Assine agora pra não perder o acesso.</text>
+                        }
+                    </p>
+                </div>
+                <form method="post" asp-page-handler="AssinarAgora">
+                    <button type="submit" class="btn btn-warning fw-semibold px-4">Assinar agora</button>
+                </form>
+            </div>
+        }
+        else if (assinatura.StatusLicenca == "pendente")
+        {
+            <div class="card card-custom p-4 mb-4" style="border-left: 4px solid #ffc107;">
+                <h6 class="text-white fw-semibold mb-1"><i class="bi bi-hourglass-split text-warning me-1"></i> Aguardando confirmação do pagamento</h6>
+                @if (!string.IsNullOrEmpty(assinatura.AsaasInvoiceUrl))
+                {
+                    <p class="text-muted small mb-2">Assim que identificarmos o pagamento, tudo aqui libera automaticamente.</p>
+                    <a href="@assinatura.AsaasInvoiceUrl" target="_blank" rel="noopener" class="btn btn-warning fw-semibold px-4" style="width: fit-content;">Pagar agora</a>
+                }
+                else
+                {
+                    <p class="text-muted small mb-0">Estamos gerando o link de pagamento - você recebe por e-mail em instantes.</p>
+                }
+            </div>
+        }
+        else if (assinatura.StatusLicenca == "suspenso")
+        {
+            <div class="card card-custom p-4 mb-4" style="border-left: 4px solid #ef4444;">
+                <h6 class="text-white fw-semibold mb-1"><i class="bi bi-exclamation-octagon-fill text-danger me-1"></i> Pagamento em atraso</h6>
+                @if (!string.IsNullOrEmpty(assinatura.AsaasInvoiceUrl))
+                {
+                    <p class="text-muted small mb-2">Regularize agora pra evitar a suspensão do acesso.</p>
+                    <a href="@assinatura.AsaasInvoiceUrl" target="_blank" rel="noopener" class="btn btn-warning fw-semibold px-4" style="width: fit-content;">Pagar agora</a>
+                }
+                else
+                {
+                    <p class="text-muted small mb-0">Regularize seu pagamento pra evitar a suspensão do acesso. Entre em contato com o suporte se não recebeu o link de cobrança.</p>
+                }
+            </div>
+        }
+    }
+
     <!-- Grid de Métricas Principais (UX Cards) -->
     <div class="row g-3 mb-4">
         <!-- Card 1: Faturamento Hoje -->

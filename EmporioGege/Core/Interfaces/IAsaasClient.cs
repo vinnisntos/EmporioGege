@@ -11,5 +11,11 @@ namespace EmporioGege.Core.Interfaces
         Task<CriarClienteAsaasResultado> CriarClienteAsync(CriarClienteAsaasDto dto, CancellationToken ct = default);
 
         Task<CriarAssinaturaAsaasResultado> CriarAssinaturaAsync(CriarAssinaturaAsaasDto dto, CancellationToken ct = default);
+
+        // Busca a cobrança mais recente gerada pra uma assinatura e devolve o link hospedado
+        // (invoiceUrl) onde o lojista paga - a criação da assinatura não retorna esse link
+        // diretamente, só a Asaas gera a primeira cobrança de forma assíncrona (geralmente
+        // quase imediata). Retorna null (não é erro) se a cobrança ainda não existir.
+        Task<string?> ObterLinkCobrancaAsync(string subscriptionId, CancellationToken ct = default);
     }
 }

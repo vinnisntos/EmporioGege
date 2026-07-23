@@ -106,6 +106,14 @@
                     Licença: @Model.Assinatura.StatusLicenca
                 </span>
             </div>
+            @if (!string.IsNullOrEmpty(Model.Assinatura.AsaasInvoiceUrl))
+            {
+                <p class="mb-2">
+                    <a href="@Model.Assinatura.AsaasInvoiceUrl" target="_blank" rel="noopener" class="text-warning">
+                        Link de cobrança (pra reenviar manualmente ao lojista) ↗
+                    </a>
+                </p>
+            }
             <p class="text-muted small mb-0">
                 Status e vencimento agora são atualizados automaticamente pelo webhook do Asaas
                 conforme os pagamentos entram - não edite "Status da licença" manualmente acima

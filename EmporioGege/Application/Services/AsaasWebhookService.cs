@@ -10,7 +10,9 @@ namespace EmporioGege.Application.Services
     // event id), aqui só SETAMOS um status - aplicar o mesmo evento duas vezes é inofensivo
     // por natureza, então não há fila própria: se o processamento falhar, devolvemos 500 e
     // deixamos a própria Asaas reentregar o evento (comportamento padrão deles).
-    public class AsaasWebhookService(IDbConnectionFactory connectionFactory, ILogger<AsaasWebhookService> logger) : IAsaasWebhookService
+    public class AsaasWebhookService(
+        IDbConnectionFactory connectionFactory, IBillingNotificationService billingNotificationService, ILogger<AsaasWebhookService> logger)
+        : IAsaasWebhookService
     {
         public async Task ProcessarAsync(string corpoJson, CancellationToken ct = default)
         {
@@ -60,6 +62,21 @@ namespace EmporioGege.Application.Services
 
             await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
 
+            // Busca o tenant e o status ANTERIOR antes de atualizar - precisamos saber se essa
+            // confirmação é a que libera o acesso pela primeira vez (ou reativa após suspensão)
+            // pra decidir se manda o e-mail de "pagamento confirmado" (ver mais abaixo). Sem
+            // isso, toda cobrança MENSAL recorrente (que também dispara PAYMENT_CONFIRMED)
+            // reenviaria o mesmo e-mail de "acesso liberado" todo mês.
+            var tenant = await connection.QuerySingleOrDefaultAsync<TenantParaWebhookRow>(new CommandDefinition(
+                "SELECT id AS Id, status_licenca AS StatusLicencaAnterior FROM tenants WHERE asaas_subscription_id = @SubscriptionId",
+                new { SubscriptionId = subscriptionId }, cancellationToken: ct));
+
+            if (tenant is null)
+            {
+                logger.LogWarning("Webhook Asaas ({Evento}) referenciou subscription {SubscriptionId} sem tenant correspondente.", evento, subscriptionId);
+                return;
+            }
+
             // Grace period de 5 dias além do vencimento da cobrança confirmada - tolera
             // pequenas diferenças de fuso/relógio entre o Asaas e a nossa checagem; quem
             // realmente controla o acesso é status_licenca (checado no login), isso aqui é
@@ -69,14 +86,16 @@ namespace EmporioGege.Application.Services
                 : null;
 
             var sql = novaDataExpiracao is not null
-                ? "UPDATE tenants SET status_licenca = @Status, data_expiracao = @DataExpiracao WHERE asaas_subscription_id = @SubscriptionId"
-                : "UPDATE tenants SET status_licenca = @Status WHERE asaas_subscription_id = @SubscriptionId";
+                ? "UPDATE tenants SET status_licenca = @Status, data_expiracao = @DataExpiracao WHERE id = @TenantId"
+                : "UPDATE tenants SET status_licenca = @Status WHERE id = @TenantId";
 
-            var linhasAfetadas = await connection.ExecuteAsync(new CommandDefinition(
-                sql, new { Status = novoStatus, DataExpiracao = novaDataExpiracao, SubscriptionId = subscriptionId }, cancellationToken: ct));
+            await connection.ExecuteAsync(new CommandDefinition(
+                sql, new { Status = novoStatus, DataExpiracao = novaDataExpiracao, TenantId = tenant.Id }, cancellationToken: ct));
 
-            if (linhasAfetadas == 0)
-                logger.LogWarning("Webhook Asaas ({Evento}) referenciou subscription {SubscriptionId} sem tenant correspondente.", evento, subscriptionId);
+            if (novoStatus == "ativo" && tenant.StatusLicencaAnterior != "ativo")
+                await billingNotificationService.EnviarPagamentoConfirmadoAsync(tenant.Id, ct);
         }
+
+        private sealed record TenantParaWebhookRow(Guid Id, string StatusLicencaAnterior);
     }
 }

@@ -8,7 +8,7 @@ namespace EmporioGege.Application.Services
     public class CadastroLojaService(
         IDbConnectionFactory connectionFactory,
         ITenantService tenantService,
-        IFaturamentoService faturamentoService,
+        IBillingNotificationService billingNotificationService,
         IConfiguration configuration,
         ILogger<CadastroLojaService> logger) : ICadastroLojaService
     {
@@ -21,6 +21,11 @@ namespace EmporioGege.Application.Services
             ["pro"] = 199.00m,
             ["enterprise"] = 349.00m
         };
+
+        // Dias de teste grátis, sem cobrança - a assinatura Asaas só é criada quando o lojista
+        // clica em "Assinar agora" (Admin/Index) ou quando o trial vence sem ação (ver
+        // Infrastructure/Faturamento/TrialExpiradoProcessor).
+        public const int DiasTrial = 7;
 
         public async Task<CadastroLojaResultado> CadastrarAsync(CadastrarLojaDto dto, CancellationToken ct = default)
         {
@@ -44,16 +49,17 @@ namespace EmporioGege.Application.Services
                 }
             }
 
-            // 1) Cria o tenant como "pendente" - bloqueia login (ver Login.cshtml.cs) até o
-            // primeiro pagamento ser confirmado pelo webhook do Asaas. DataExpiracao aqui é só
-            // um placeholder (o "pendente" tem seu próprio case no switch de bloqueio, então
-            // nunca cai na checagem de expiração) - o webhook seta a data real quando ativa.
+            // 1) Cria o tenant como "trial" - acesso liberado na hora, sem cobrança, por
+            // DiasTrial dias (ver Login.cshtml.cs). DataExpiracao aqui já é a data real de fim
+            // do trial (diferente do "pendente" antigo, onde era só um placeholder) - o job
+            // TrialExpiradoProcessor usa ela pra saber quando converter em cobrança.
             Guid tenantId;
+            var dataFimTrial = DateTime.UtcNow.AddDays(DiasTrial);
             try
             {
                 tenantId = await tenantService.SalvarAsync(new SalvarTenantDto(
                     null, dto.NomeFantasia, dto.NomeRepresentante, dto.CpfRgDono, dto.Cnpj, dto.CidadeEstado,
-                    null, dto.TelefoneDono, null, dto.EmailDono, "pendente", DateTime.UtcNow), ct);
+                    null, dto.TelefoneDono, null, dto.EmailDono, "trial", dataFimTrial), ct);
             }
             catch (Exception ex)
             {
@@ -61,15 +67,21 @@ namespace EmporioGege.Application.Services
                 return new CadastroLojaResultado(false, null, "Não foi possível registrar sua loja. Tente novamente em instantes.", "tenant");
             }
 
-            // 2) Persiste plano/valor já aqui, mesmo antes da assinatura existir de verdade -
-            // não fatal se falhar, serve só pra quem for finalizar manualmente (ver
-            // SuperAdmin/Adegas/Editar) saber qual plano foi escolhido.
+            // 2) Persiste plano/valor/forma de pagamento já aqui, mesmo antes de existir
+            // qualquer cobrança de verdade - não fatal se falhar, mas SÃO os dados que
+            // IniciarCobrancaTrialAsync lê depois pra criar a assinatura (fim do trial ou
+            // "Assinar agora"), então uma falha aqui deixa a loja sem forma de converter
+            // automaticamente (só manualmente via SuperAdmin/Adegas/Editar).
             try
             {
                 await using var connection = await connectionFactory.CreateOpenConnectionAsync(ct);
                 await connection.ExecuteAsync(new CommandDefinition(
-                    "UPDATE tenants SET plano = @Plano, valor_mensalidade = @ValorMensalidade WHERE id = @TenantId",
-                    new { dto.Plano, ValorMensalidade = valorMensalidade, TenantId = tenantId }, cancellationToken: ct));
+                    """
+                    UPDATE tenants SET plano = @Plano, valor_mensalidade = @ValorMensalidade,
+                           forma_pagamento_preferida = @TipoCobranca
+                    WHERE id = @TenantId
+                    """,
+                    new { dto.Plano, ValorMensalidade = valorMensalidade, dto.TipoCobranca, TenantId = tenantId }, cancellationToken: ct));
             }
             catch (Exception ex)
             {
@@ -125,23 +137,13 @@ namespace EmporioGege.Application.Services
                     "perfil");
             }
 
-            // 5) Cria a assinatura de verdade no Asaas - reaproveita o mesmo serviço já usado
-            // pelo superadmin em SuperAdmin/Adegas/Editar. Diferente das etapas acima, uma
-            // falha aqui NÃO invalida o cadastro: loja, login e perfil já são válidos e
-            // funcionais (só ficam bloqueados em "pendente" até alguém acionar "Criar
-            // Assinatura" manualmente naquela mesma tela).
-            var resultadoAssinatura = await faturamentoService.CriarAssinaturaAsync(tenantId, dto.Plano, valorMensalidade, dto.TipoCobranca, ct);
-
-            if (!resultadoAssinatura.Sucesso)
-            {
-                logger.LogWarning("Assinatura Asaas falhou no autocadastro (tenant {TenantId}): {Mensagem}", tenantId, resultadoAssinatura.MensagemErro);
-                return new CadastroLojaResultado(true, tenantId,
-                    "Cadastro recebido! Falta confirmar seu e-mail (enviamos um link de confirmação) - o pagamento da assinatura será configurado pela nossa equipe em instantes, e seu acesso libera automaticamente assim que for confirmado.",
-                    "asaas");
-            }
+            // 5) Sem cobrança nenhuma criada agora - o trial é grátis de verdade. Só avisa por
+            // e-mail (best-effort: EnviarBoasVindasTrialAsync nunca lança, ver
+            // BillingNotificationService) que o teste começou e como assinar quando quiser.
+            await billingNotificationService.EnviarBoasVindasTrialAsync(tenantId, DiasTrial, ct);
 
             return new CadastroLojaResultado(true, tenantId,
-                "Cadastro recebido! Confirme seu e-mail pelo link que enviamos, e aguarde a confirmação do primeiro pagamento - seu acesso libera automaticamente assim que identificarmos.",
+                $"Cadastro recebido! Confirme seu e-mail pelo link que enviamos e faça login - você tem {DiasTrial} dias grátis pra usar o PendurAi sem nenhuma cobrança. Quando quiser assinar, é só clicar em \"Assinar agora\" dentro do painel.",
                 null);
         }
     }

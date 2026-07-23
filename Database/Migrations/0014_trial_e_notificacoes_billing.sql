@@ -1,0 +1,23 @@
+-- =============================================================================
+-- Migration 0014: trial gratuito no autocadastro + link de cobrança guardado.
+--
+-- Contexto: até aqui (migration 0012) o autocadastro (/CadastroLoja) já nascia
+-- com uma assinatura Asaas cobrando desde o primeiro ciclo (vencimento em 7
+-- dias), sem período de teste. A partir de agora o cadastro cria o tenant com
+-- status_licenca = 'trial' (novo valor possível na coluna, que continua sem
+-- CHECK constraint - texto livre) e SEM criar a assinatura Asaas na hora. A
+-- cobrança de verdade só é criada quando o lojista clica em "Assinar agora"
+-- no painel (Admin/Index) OU quando o trial expira sem ação (job em
+-- Infrastructure/Faturamento/TrialExpiradoProcessor.cs) - por isso agora
+-- precisamos guardar a forma de pagamento escolhida no cadastro (antes ela só
+-- era usada na hora, nunca persistida).
+--
+-- asaas_invoice_url guarda o link da última cobrança (boleto/PIX/cartão)
+-- gerada pela Asaas, pra mostrar na tela de sucesso do cadastro, no painel do
+-- lojista (Admin/Index) e nos e-mails de instrução de pagamento - evita ficar
+-- refazendo a chamada à API da Asaas toda vez que a tela for aberta.
+--
+-- Idempotente. Rodar manualmente no SQL Editor do Supabase.
+-- =============================================================================
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS forma_pagamento_preferida text; -- 'PIX', 'BOLETO' ou 'CREDIT_CARD'
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS asaas_invoice_url text;

@@ -134,7 +134,10 @@
                     <i class="bi bi-check-circle-fill success-icon mb-3"></i>
                     <h2 class="brand-title mb-3">Cadastro Recebido</h2>
                     <p class="text-muted-custom mx-auto" style="font-size: 0.95rem;">@Model.MensagemSucesso</p>
-                    <a asp-page="/Index" class="btn btn-cadastrar mt-3 px-4">Voltar para o site institucional</a>
+                    <a asp-page="/Auth/Login" class="btn btn-cadastrar mt-3 px-4">Fazer login</a>
+                    <div class="mt-2">
+                        <a asp-page="/Index" class="text-decoration-none text-muted-custom small">Voltar para o site institucional</a>
+                    </div>
                 </div>
             }
             else
@@ -232,7 +235,8 @@
                     </div>
                     <span asp-validation-for="Plano" class="validation-error mb-3 d-block"></span>
 
-                    <h6 class="text-muted-custom text-uppercase small fw-bold mb-2 mt-4">Forma de pagamento</h6>
+                    <h6 class="text-muted-custom text-uppercase small fw-bold mb-2 mt-4">Forma de pagamento preferida</h6>
+                    <p class="text-muted-custom mb-2" style="font-size: 0.8rem;">Você não paga nada agora — é só pra sabermos como gerar sua cobrança quando o teste grátis de 7 dias acabar.</p>
                     <div class="row g-2 mb-4">
                         <div class="col-md-4">
                             <label class="pagamento-opcao d-flex align-items-center w-100 mb-0">
@@ -252,7 +256,7 @@
                     </div>
 
                     <div class="d-grid gap-2 mb-3">
-                        <button type="submit" class="btn btn-cadastrar">Criar minha loja</button>
+                        <button type="submit" class="btn btn-cadastrar">Começar meu teste grátis de 7 dias</button>
                     </div>
 
                     <div class="text-center">

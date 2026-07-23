@@ -104,6 +104,13 @@ namespace EmporioGege.Pages.Auth
                             // seedada com a data de criação, que cairia como "expirada" já no dia
                             // seguinte se essa checagem não tivesse prioridade sobre aquela.
                             "pendente" => "Cadastro em análise: estamos aguardando a confirmação do primeiro pagamento. Você receberá um e-mail assim que for confirmado.",
+                            // Trial vencido, mas o job (TrialExpiradoProcessor, roda de hora em
+                            // hora) ainda não converteu pra "pendente" - mensagem própria em vez
+                            // de cair no "Licença expirada" genérico, já que aqui é esperado (não
+                            // indica problema) e se resolve sozinho em minutos.
+                            "trial" when tenant.DataExpiracao.Date < DateTime.UtcNow.Date =>
+                                "Seu período de teste terminou. Estamos gerando sua cobrança - você recebe um e-mail com o link de pagamento em instantes. Tente novamente em alguns minutos.",
+                            "trial" => null, // Dentro do período de teste: acesso liberado, sem cobrança.
                             _ when tenant.DataExpiracao.Date < DateTime.UtcNow.Date =>
                                 "Licença expirada. Entre em contato com o suporte.",
                             _ => null

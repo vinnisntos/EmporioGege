@@ -69,6 +69,29 @@ namespace EmporioGege.Infrastructure.Faturamento
             return new CriarAssinaturaAsaasResultado(true, id, status, null);
         }
 
+        public async Task<string?> ObterLinkCobrancaAsync(string subscriptionId, CancellationToken ct = default)
+        {
+            using var resposta = await httpClient.GetAsync($"payments?subscription={Uri.EscapeDataString(subscriptionId)}&limit=1", ct);
+            var conteudo = await resposta.Content.ReadAsStringAsync(ct);
+
+            if (!resposta.IsSuccessStatusCode)
+            {
+                logger.LogWarning("Asaas recusou a consulta de cobranças da assinatura {SubscriptionId}: {Status} {Conteudo}",
+                    subscriptionId, resposta.StatusCode, conteudo);
+                return null;
+            }
+
+            using var documento = JsonDocument.Parse(conteudo);
+            if (!documento.RootElement.TryGetProperty("data", out var dadosEl) || dadosEl.ValueKind != JsonValueKind.Array || dadosEl.GetArrayLength() == 0)
+            {
+                logger.LogWarning("Assinatura {SubscriptionId} ainda não tem nenhuma cobrança gerada na Asaas.", subscriptionId);
+                return null;
+            }
+
+            var primeiraCobranca = dadosEl[0];
+            return primeiraCobranca.TryGetProperty("invoiceUrl", out var urlEl) ? urlEl.GetString() : null;
+        }
+
         private static string? ExtrairMensagemErro(string corpoResposta)
         {
             try
